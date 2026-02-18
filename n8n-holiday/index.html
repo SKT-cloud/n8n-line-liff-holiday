@@ -43,7 +43,6 @@
       <div class="field">
         <label>ช่วงวันที่หยุด</label>
 
-        <!-- ✅ มีขีดกลาง + ไม่เละ: ใช้ row--date -->
         <div class="row row--date">
           <div class="date-col">
             <input id="startDate" type="text" readonly placeholder="กรุณาเลือกวันที่เริ่ม" />
@@ -75,15 +74,12 @@
         <small class="hint">แสดงเป็นบล็อค แยกตามวัน และเรียงตามเวลาเรียน ✅</small>
       </div>
 
-      <!-- ✅ Selected summary -->
       <div id="subjectSelected" class="selected hidden"></div>
 
-      <!-- ✅ Block picker list -->
       <div id="subjectsList" class="subjects" aria-label="รายการวิชา">
         <div class="subjects__loading">กำลังโหลดรายชื่อวิชา…</div>
       </div>
 
-      <!-- ✅ Cancel date -->
       <div id="cancelDateBox" class="field hidden" style="margin-top:12px;">
         <label for="cancelDate">เลือกวันที่ยกคลาส</label>
         <input id="cancelDate" type="text" readonly placeholder="กรุณาเลือกวันที่ยกคลาส" />
@@ -102,12 +98,54 @@
 
   <script type="module" src="./js/main.js"></script>
 
+  <!-- ✅ ของเดิมคุณมีอยู่แล้ว -->
   <div id="successOverlay" class="successOverlay hidden">
-  <div class="successBox">
-    <div class="checkmark">✓</div>
-    <div class="successText">บันทึกสำเร็จ</div>
+    <div class="successBox">
+      <div class="checkmark">✓</div>
+      <div class="successText">บันทึกสำเร็จ</div>
+    </div>
   </div>
-</div>
+
+  <!-- ✅ NEW: ถามว่าจะตั้งแจ้งเตือนไหม -->
+  <div id="reminderAskOverlay" class="modalOverlay hidden" role="dialog" aria-modal="true">
+    <div class="modalBox">
+      <div class="modalTitle">ตั้งแจ้งเตือนมั้ย? 🔔</div>
+      <div id="reminderAskSummary" class="modalSub"></div>
+
+      <div class="modalActions">
+        <button id="reminderCloseBtn" class="btn btn--ghost btn--half" type="button">ปิด</button>
+        <button id="reminderSetBtn" class="btn btn--half" type="button">ตั้ง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ NEW: เลือก preset (เก็บไว้ก่อน ยังไม่ยิง backend) -->
+  <div id="reminderPickOverlay" class="modalOverlay hidden" role="dialog" aria-modal="true">
+    <div class="modalBox">
+      <div class="modalTitle">เลือกเวลาที่อยากให้แจ้งเตือน</div>
+      <div class="modalSub">ตอนนี้จะ “บันทึกการตั้งค่าไว้ในเครื่อง” ก่อนนะ (Phase ต่อไปค่อยส่งจริง) 💾</div>
+
+      <div class="radioList">
+        <label class="radioItem">
+          <input type="radio" name="remPreset" value="1d" checked />
+          <span>ก่อน 1 วัน</span>
+        </label>
+        <label class="radioItem">
+          <input type="radio" name="remPreset" value="3h" />
+          <span>ก่อน 3 ชั่วโมง</span>
+        </label>
+        <label class="radioItem">
+          <input type="radio" name="remPreset" value="1h" />
+          <span>ก่อน 1 ชั่วโมง</span>
+        </label>
+      </div>
+
+      <div class="modalActions">
+        <button id="reminderPickBackBtn" class="btn btn--ghost btn--half" type="button">ย้อนกลับ</button>
+        <button id="reminderPickSaveBtn" class="btn btn--half" type="button">บันทึกการตั้งค่า</button>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>

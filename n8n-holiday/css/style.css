@@ -173,7 +173,7 @@ input, select{
 }
 
 .subjectTime{
-  min-width:96px; /* ให้เวลาเรียงแนวเดียว */
+  min-width:96px;
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-weight:900;
@@ -245,26 +245,12 @@ input, select{
 }
 
 /* ===== Fix Date Range Layout ===== */
+.row--date { display:flex; align-items:center; gap:12px; }
+.row--date .date-col { flex:1; }
+.row--date .date-sep { flex:0 0 auto; font-weight:600; opacity:0.6; padding:0 4px; user-select:none; }
 
-.row--date {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.row--date .date-col {
-  flex: 1;
-}
-
-.row--date .date-sep {
-  flex: 0 0 auto;      /* 🔥 ตัวนี้แหละที่กันไม่ให้มันยืด */
-  font-weight: 600;
-  opacity: 0.6;
-  padding: 0 4px;
-  user-select: none;
-}
-
-.successOverlay {
+/* ===== Success overlay (ของเดิมคุณมี) ===== */
+.successOverlay{
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.5);
@@ -273,40 +259,90 @@ input, select{
   justify-content:center;
   z-index:9999;
 }
+.successOverlay.hidden{ display:none; }
 
-.successOverlay.hidden {
-  display:none;
-}
-
-.successBox {
+.successBox{
   background:white;
   padding:30px;
   border-radius:20px;
   text-align:center;
   animation: popIn .3s ease;
 }
-
-.checkmark {
+.checkmark{
   font-size:60px;
   color:#00c851;
   animation: bounce 0.6s ease;
 }
-
-.successText {
+.successText{
   margin-top:10px;
   font-weight:600;
   font-size:18px;
 }
+@keyframes popIn { from { transform: scale(.8); opacity:0; } to { transform: scale(1); opacity:1; } }
+@keyframes bounce { 0% { transform: scale(0); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
-@keyframes popIn {
-  from { transform: scale(.8); opacity:0; }
-  to { transform: scale(1); opacity:1; }
+/* ===== NEW: Reminder modal overlays ===== */
+
+.modalOverlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:10000;
+}
+.modalOverlay.hidden{ display:none; }
+
+.modalBox{
+  width: min(520px, calc(100vw - 32px));
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 16px;
+  animation: popIn .25s ease;
 }
 
-@keyframes bounce {
-  0% { transform: scale(0); }
-  60% { transform: scale(1.2); }
-  100% { transform: scale(1); }
+.modalTitle{
+  font-size:18px;
+  font-weight:900;
 }
 
+.modalSub{
+  margin-top:6px;
+  color: var(--muted);
+  font-size:13px;
+  line-height:1.35;
+}
 
+.modalActions{
+  display:flex;
+  gap:10px;
+  margin-top:14px;
+}
+
+/* ปุ่มซ้าย/ขวา: ปิดซ้าย / ตั้งขวา */
+.btn--half{
+  width: 50%;
+  margin-top: 0;
+}
+
+.radioList{
+  margin-top:12px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  overflow:hidden;
+}
+
+.radioItem{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:12px;
+  border-top:1px solid var(--border);
+  cursor:pointer;
+  user-select:none;
+}
+.radioItem:first-child{ border-top:0; }
+.radioItem:hover{ background:#fafafa; }
+.radioItem input{ width:auto; margin:0; }

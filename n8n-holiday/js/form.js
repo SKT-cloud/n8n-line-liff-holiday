@@ -8,7 +8,6 @@ function qs(id) {
 
 function showMsg(text, type = "") {
   const msg = qs("msg");
-  // style.css มี msg--ok / msg--err เท่านั้น :contentReference[oaicite:4]{index=4}
   msg.className = "msg" + (type ? ` msg--${type}` : "");
   msg.textContent = text || "";
 }
@@ -33,7 +32,6 @@ function setModeUI(mode) {
 }
 
 function toIsoBangkokStartEnd(startDateYYYYMMDD, endDateYYYYMMDD) {
-  // ใช้ +07:00 แบบที่คุณกำหนดไว้
   const start = `${startDateYYYYMMDD}T00:00:00+07:00`;
   const end = `${endDateYYYYMMDD}T23:59:59+07:00`;
   return { start_at: start, end_at: end };
@@ -45,13 +43,7 @@ function normalizeDayOrder(day) {
   return idx === -1 ? 999 : idx;
 }
 
-/**
- * รองรับ options 2 format:
- * A) แบบใหม่ที่คุณอยากได้: { id, day, time, code, name, type, section }
- * B) แบบใน api.js ตอนนี้: { subject_id, label, meta:{...} } :contentReference[oaicite:5]{index=5}
- */
 function normalizeOption(raw, fallbackDay) {
-  // Format A
   if (raw && (raw.id || raw.subject_id) && (raw.code || raw.meta || raw.label)) {
     const meta = raw.meta || {};
     const id = raw.id || raw.subject_id;
@@ -78,7 +70,6 @@ function normalizeOption(raw, fallbackDay) {
     };
   }
 
-  // Fallback (กันพัง)
   return {
     id: raw?.id || raw?.subject_id || crypto.randomUUID(),
     day: fallbackDay || "",
@@ -103,7 +94,6 @@ function renderSubjects(groups, state, onPick) {
     const dayWrap = document.createElement("div");
     dayWrap.className = "dayGroup";
 
-    // style.css ใช้ .dayHeader :contentReference[oaicite:6]{index=6}
     const header = document.createElement("div");
     header.className = "dayHeader";
     header.textContent = g.day || "ไม่ระบุวัน";
@@ -115,26 +105,13 @@ function renderSubjects(groups, state, onPick) {
       const item = document.createElement("button");
       item.type = "button";
       item.className = "subjectItem";
-
-      // style.css ใช้ isActive :contentReference[oaicite:7]{index=7}
       if (state.selectedSubject?.id === opt.id) item.classList.add("isActive");
 
       const searchable = [
-        opt.time,
-        opt.code,
-        opt.name,
-        opt.type,
-        opt.day,
-        opt.section,
-        opt.label
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
+        opt.time, opt.code, opt.name, opt.type, opt.day, opt.section, opt.label
+      ].filter(Boolean).join(" ").toLowerCase();
       item.dataset.search = searchable;
 
-      // จัด layout ให้ match class ใน style.css :contentReference[oaicite:8]{index=8}
       item.innerHTML = `
         <div class="subjectTime">${opt.time || ""}</div>
         <div class="subjectMain">
@@ -178,6 +155,40 @@ function setSelectedSubjectUI(subject) {
   `;
 }
 
+// ===== NEW: Post-save reminder flow =====
+function openOverlay(id) { document.getElementById(id)?.classList.remove("hidden"); }
+function closeOverlay(id) { document.getElementById(id)?.classList.add("hidden"); }
+
+function buildSummaryText(payload, selectedSubject) {
+  // สรุปสั้น ๆ ไปแสดงใน modal
+  const start = String(payload.start_at || "").slice(0, 10);
+  const end = String(payload.end_at || "").slice(0, 10);
+  const dateText = start === end ? start : `${start} – ${end}`;
+
+  if (payload.type === "cancel") {
+    const subj = selectedSubject
+      ? `${selectedSubject.code} ${selectedSubject.name} (${selectedSubject.type})`
+      : "ยกคลาส";
+    return `${subj}\nวันที่: ${dateText}`;
+  }
+  return `วันหยุด\nวันที่: ${dateText}`;
+}
+
+function saveReminderDraft({ userId, payload, preset }) {
+  const draft = {
+    user_id: userId,
+    created_at: new Date().toISOString(),
+    preset,
+    // เก็บ key สำคัญเพื่อไปผูกกับ holiday ที่เพิ่งสร้าง (Phase ต่อไป)
+    type: payload.type,
+    subject_id: payload.subject_id ?? null,
+    start_at: payload.start_at,
+    end_at: payload.end_at,
+    title: payload.title ?? null
+  };
+  localStorage.setItem("holiday_reminder_draft", JSON.stringify(draft));
+}
+
 export function initHolidayForm({ userId, displayName, subjectsUrl, submitUrl, onDone }) {
   qs("who").textContent = displayName ? `คุณ ${displayName}` : "ผู้ใช้ LINE";
 
@@ -202,7 +213,6 @@ export function initHolidayForm({ userId, displayName, subjectsUrl, submitUrl, o
       btn.disabled = true;
       return;
     }
-
     if (modeEl.value === "cancel_subject") {
       btn.disabled = !(state.selectedSubject && cancelDateEl.value);
     } else {
@@ -251,6 +261,18 @@ export function initHolidayForm({ userId, displayName, subjectsUrl, submitUrl, o
   endDateEl.addEventListener("change", validate);
   cancelDateEl.addEventListener("change", validate);
   titleEl.addEventListener("input", validate);
+
+  // ===== bind reminder modal buttons once =====
+  const askCloseBtn = document.getElementById("reminderCloseBtn");
+  const askSetBtn = document.getElementById("reminderSetBtn");
+  const pickBackBtn = document.getElementById("reminderPickBackBtn");
+  const pickSaveBtn = document.getElementById("reminderPickSaveBtn");
+  const askSummaryEl = document.getElementById("reminderAskSummary");
+
+  function getSelectedPreset() {
+    const el = document.querySelector('input[name="remPreset"]:checked');
+    return el?.value || "1d";
+  }
 
   qs("submitBtn").addEventListener("click", async () => {
     if (state.submitting) return;
@@ -304,13 +326,60 @@ export function initHolidayForm({ userId, displayName, subjectsUrl, submitUrl, o
         };
       }
 
-      await submitHoliday({ submitUrl, payload }); // ใช้ของใน api.js :contentReference[oaicite:9]{index=9}
+      await submitHoliday({ submitUrl, payload }); // api.js ของคุณ :contentReference[oaicite:4]{index=4}
 
-      // success animation + close
-      document.getElementById("successOverlay")?.classList.remove("hidden"); // index.html มีแล้ว :contentReference[oaicite:10]{index=10}
+      // 1) show check animation
+      openOverlay("successOverlay");
+
+      // 2) after a short beat -> ask reminders
       setTimeout(() => {
-        try { onDone?.(); } catch {}
-      }, 1200);
+        closeOverlay("successOverlay");
+
+        // แสดงสรุปใน dialog
+        if (askSummaryEl) {
+          askSummaryEl.textContent = buildSummaryText(payload, state.selectedSubject);
+        }
+
+        openOverlay("reminderAskOverlay");
+
+        // bind actions (reset handlers)
+        if (askCloseBtn) {
+          askCloseBtn.onclick = () => {
+            closeOverlay("reminderAskOverlay");
+            try { onDone?.(); } catch {}
+          };
+        }
+
+        if (askSetBtn) {
+          askSetBtn.onclick = () => {
+            closeOverlay("reminderAskOverlay");
+            openOverlay("reminderPickOverlay");
+          };
+        }
+
+        if (pickBackBtn) {
+          pickBackBtn.onclick = () => {
+            closeOverlay("reminderPickOverlay");
+            openOverlay("reminderAskOverlay");
+          };
+        }
+
+        if (pickSaveBtn) {
+          pickSaveBtn.onclick = () => {
+            const preset = getSelectedPreset();
+            saveReminderDraft({ userId, payload, preset });
+
+            // ปิด modal แล้วปิด LIFF
+            closeOverlay("reminderPickOverlay");
+            showMsg("บันทึกการตั้งค่าแจ้งเตือนไว้แล้ว 🔔", "ok");
+            setTimeout(() => {
+              try { onDone?.(); } catch {}
+            }, 600);
+          };
+        }
+
+      }, 900);
+
     } catch (e) {
       showMsg(`บันทึกไม่สำเร็จ: ${String(e?.message || e)}`, "err");
     } finally {
@@ -323,7 +392,7 @@ export function initHolidayForm({ userId, displayName, subjectsUrl, submitUrl, o
   async function loadSubjects() {
     try {
       showMsg("กำลังโหลดรายชื่อวิชา…");
-      const groups = await fetchSubjectGroups({ subjectsUrl, userId }); // api.js :contentReference[oaicite:11]{index=11}
+      const groups = await fetchSubjectGroups({ subjectsUrl, userId }); // api.js :contentReference[oaicite:5]{index=5}
       state.groups = Array.isArray(groups) ? groups : [];
 
       renderSubjects(state.groups, state, pickSubject);
@@ -331,7 +400,6 @@ export function initHolidayForm({ userId, displayName, subjectsUrl, submitUrl, o
       showMsg("");
     } catch (e) {
       showMsg(`โหลดวิชาไม่สำเร็จ: ${String(e?.message || e)}`, "err");
-      // ยังให้ใช้ all_day ต่อได้
     } finally {
       validate();
     }
