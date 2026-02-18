@@ -1,6 +1,5 @@
 <!doctype html>
 <html lang="th">
-
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -44,21 +43,18 @@
       <div class="field">
         <label>ช่วงวันที่หยุด</label>
 
-        <!-- ✅ FIX: เอา date-sep ออก เหลือแค่ 2 div -->
-        <div class="row row--date">
-          <div class="date-col">
-            <input id="startDate" type="date" lang="en-GB" placeholder="เลือกวันที่เริ่ม" />
+        <!-- ✅ ไม่ใส่ date-sep ตรงกลาง เพื่อกันเละกับ CSS เดิม -->
+        <div class="row">
+          <div>
+            <input id="startDate" type="text" readonly placeholder="กรุณาเลือกวันที่เริ่ม" />
             <small id="startDatePretty" class="hint"></small>
           </div>
 
-          <div class="date-sep">–</div>
-
-          <div class="date-col">
-            <input id="endDate" type="date" lang="en-GB" placeholder="เลือกวันที่สิ้นสุด" />
+          <div>
+            <input id="endDate" type="text" readonly placeholder="หากหยุดวันเดียว สามารถเว้นไว้ได้" />
             <small id="endDatePretty" class="hint"></small>
           </div>
         </div>
-
 
         <small class="hint">ถ้าหยุดวันเดียว เลือกแค่ช่องแรกได้เลย ✅</small>
       </div>
@@ -66,24 +62,9 @@
 
     <!-- CANCEL SUBJECT -->
     <section id="cancelBox" class="section hidden">
-      <div class="field">
-        <label for="subjectSearch">ค้นหาวิชา</label>
-        <input id="subjectSearch" type="text" placeholder="พิมพ์ค้นหา: รหัสวิชา / ชื่อ / วัน / เวลา / T / L"
-          autocomplete="off" />
-        <small class="hint">แสดงเป็นบล็อค แยกตามวัน และเรียงตามเวลาเรียน ✅</small>
-      </div>
-
-      <!-- Selected summary -->
-      <div id="subjectSelected" class="selected hidden"></div>
-
-      <!-- Block picker container -->
-      <div id="subjectsList" class="subjects" aria-label="รายการวิชา">
-        <div class="subjects__loading">กำลังโหลดรายชื่อวิชา…</div>
-      </div>
-
-      <div id="cancelDateBox" class="field hidden" style="margin-top:12px;">
+      <div id="cancelDateBox" class="field hidden">
         <label for="cancelDate">เลือกวันที่ยกคลาส</label>
-        <input id="cancelDate" type="date" lang="en-GB" placeholder="เลือกวันที่ยกคลาส" />
+        <input id="cancelDate" type="text" readonly placeholder="กรุณาเลือกวันที่ยกคลาส" />
         <small id="cancelDatePretty" class="hint"></small>
       </div>
     </section>
@@ -99,5 +80,4 @@
 
   <script type="module" src="./js/main.js"></script>
 </body>
-
 </html>

@@ -18,16 +18,33 @@ function initDatePickers() {
     const input = document.getElementById(inputId);
     if (!input) return;
 
+    // กันการพิมพ์/เด้งคีย์บอร์ด (รวมถึงบางมือถือ)
+    input.readOnly = true;
+    input.setAttribute("inputmode", "none");
+    input.setAttribute("autocomplete", "off");
+
     flatpickr(input, {
       dateFormat: "Y-m-d",
       altInput: true,
       altFormat: "d/m/Y",
-      allowInput: true,
+
+      // 🔥 ห้ามพิมพ์เอง
+      allowInput: false,
+
+      // 🔥 บังคับใช้ UI ของ flatpickr แม้บนมือถือ (ไม่ใช้ native date picker)
       disableMobile: true,
+
       onReady: (_, __, instance) => {
+        // altInput คือช่องที่ผู้ใช้เห็นจริง ให้ล็อกเหมือนกัน
         if (instance.altInput) {
           instance.altInput.placeholder = placeholderText;
           instance.altInput.autocomplete = "off";
+          instance.altInput.readOnly = true;
+          instance.altInput.setAttribute("inputmode", "none");
+
+          // กัน paste / keydown บางกรณี
+          instance.altInput.addEventListener("keydown", (e) => e.preventDefault());
+          instance.altInput.addEventListener("paste", (e) => e.preventDefault());
         }
       }
     });
