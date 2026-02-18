@@ -43,14 +43,16 @@
       <div class="field">
         <label>ช่วงวันที่หยุด</label>
 
-        <!-- ✅ ไม่ใส่ date-sep ตรงกลาง เพื่อกันเละกับ CSS เดิม -->
-        <div class="row">
-          <div>
+        <!-- ✅ มีขีดกลาง + ไม่เละ: ใช้ row--date -->
+        <div class="row row--date">
+          <div class="date-col">
             <input id="startDate" type="text" readonly placeholder="กรุณาเลือกวันที่เริ่ม" />
             <small id="startDatePretty" class="hint"></small>
           </div>
 
-          <div>
+          <div class="date-sep">–</div>
+
+          <div class="date-col">
             <input id="endDate" type="text" readonly placeholder="หากหยุดวันเดียว สามารถเว้นไว้ได้" />
             <small id="endDatePretty" class="hint"></small>
           </div>
@@ -62,7 +64,27 @@
 
     <!-- CANCEL SUBJECT -->
     <section id="cancelBox" class="section hidden">
-      <div id="cancelDateBox" class="field hidden">
+      <div class="field">
+        <label for="subjectSearch">ค้นหาวิชา</label>
+        <input
+          id="subjectSearch"
+          type="text"
+          placeholder="พิมพ์ค้นหา: รหัสวิชา / ชื่อ / วัน / เวลา / T / L"
+          autocomplete="off"
+        />
+        <small class="hint">แสดงเป็นบล็อค แยกตามวัน และเรียงตามเวลาเรียน ✅</small>
+      </div>
+
+      <!-- ✅ Selected summary -->
+      <div id="subjectSelected" class="selected hidden"></div>
+
+      <!-- ✅ Block picker list -->
+      <div id="subjectsList" class="subjects" aria-label="รายการวิชา">
+        <div class="subjects__loading">กำลังโหลดรายชื่อวิชา…</div>
+      </div>
+
+      <!-- ✅ Cancel date -->
+      <div id="cancelDateBox" class="field hidden" style="margin-top:12px;">
         <label for="cancelDate">เลือกวันที่ยกคลาส</label>
         <input id="cancelDate" type="text" readonly placeholder="กรุณาเลือกวันที่ยกคลาส" />
         <small id="cancelDatePretty" class="hint"></small>
