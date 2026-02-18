@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>เพิ่มวันหยุด</title>
+
+  <link rel="stylesheet" href="./css/style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+</head>
+
+<body>
+  <div id="loading" class="loading">
+    <div class="loading__box">
+      <div class="loading__title">กำลังเตรียมฟอร์ม…</div>
+      <div class="loading__subtitle">กำลังตรวจสอบการเข้าสู่ระบบ LINE 🔐</div>
+    </div>
+  </div>
+
+  <div id="app" class="card hidden">
+    <div class="card__header">
+      <h1 class="card__title">เพิ่มวันหยุด</h1>
+      <div id="who" class="pill"></div>
+    </div>
+
+    <div class="field">
+      <label for="title">หัวข้อ (ไม่จำเป็น)</label>
+      <input id="title" type="text" placeholder="เช่น ไปอบรม / ป่วย" autocomplete="off" />
+    </div>
+
+    <div class="field">
+      <label for="mode">ประเภท</label>
+      <select id="mode">
+        <option value="all_day">หยุดทั้งวัน</option>
+        <option value="cancel_subject">ยกคลาส (เลือกวิชา)</option>
+      </select>
+    </div>
+
+    <!-- ALL DAY -->
+    <section id="allDayBox" class="section">
+      <div class="field">
+        <label>ช่วงวันที่หยุด</label>
+
+        <!-- ✅ FIX: เอา date-sep ออก เหลือแค่ 2 div -->
+        <div class="row">
+          <div>
+            <input id="startDate" type="date" lang="en-GB" placeholder="เลือกวันที่เริ่ม" />
+            <small id="startDatePretty" class="hint"></small>
+          </div>
+
+          <div>
+            <input id="endDate" type="date" lang="en-GB" placeholder="เลือกวันที่สิ้นสุด" />
+            <small id="endDatePretty" class="hint"></small>
+          </div>
+        </div>
+
+        <small class="hint">ถ้าหยุดวันเดียว เลือกแค่ช่องแรกได้เลย ✅</small>
+      </div>
+    </section>
+
+    <!-- CANCEL SUBJECT -->
+    <section id="cancelBox" class="section hidden">
+      <div class="field">
+        <label for="subjectSearch">ค้นหาวิชา</label>
+        <input
+          id="subjectSearch"
+          type="text"
+          placeholder="พิมพ์ค้นหา: รหัสวิชา / ชื่อ / วัน / เวลา / T / L"
+          autocomplete="off"
+        />
+        <small class="hint">แสดงเป็นบล็อค แยกตามวัน และเรียงตามเวลาเรียน ✅</small>
+      </div>
+
+      <!-- Selected summary -->
+      <div id="subjectSelected" class="selected hidden"></div>
+
+      <!-- Block picker container -->
+      <div id="subjectsList" class="subjects" aria-label="รายการวิชา">
+        <div class="subjects__loading">กำลังโหลดรายชื่อวิชา…</div>
+      </div>
+
+      <div id="cancelDateBox" class="field hidden" style="margin-top:12px;">
+        <label for="cancelDate">เลือกวันที่ยกคลาส</label>
+        <input id="cancelDate" type="date" lang="en-GB" placeholder="เลือกวันที่ยกคลาส" />
+        <small id="cancelDatePretty" class="hint"></small>
+      </div>
+    </section>
+
+    <button id="submitBtn" class="btn" disabled>บันทึก</button>
+
+    <div id="msg" class="msg"></div>
+
+    <div class="footer">
+      <button id="resetBtn" class="btn btn--ghost" type="button">ล้างฟอร์ม</button>
+    </div>
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

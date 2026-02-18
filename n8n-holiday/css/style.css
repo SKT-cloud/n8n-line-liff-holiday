@@ -1,0 +1,246 @@
+:root{
+  --bg:#fafafa;
+  --card:#fff;
+  --border:#e5e5e5;
+  --text:#111;
+  --muted:#666;
+  --danger:#b00020;
+  --ok:#0b6b0b;
+  --btn:#111;
+  --btnText:#fff;
+  --radius:14px;
+}
+
+*{ box-sizing:border-box; }
+body{
+  margin:0;
+  padding:16px;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif;
+  background:var(--bg);
+  color:var(--text);
+}
+
+.hidden{ display:none !important; }
+
+.loading{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:60vh;
+  color:#444;
+}
+.loading__box{
+  max-width:560px;
+  width:100%;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px;
+}
+.loading__title{ font-size:18px; font-weight:800; }
+.loading__subtitle{ margin-top:6px; color:var(--muted); }
+
+.card{
+  max-width:560px;
+  margin:0 auto;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px;
+}
+.card__header{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.card__title{ margin:0; font-size:22px; }
+
+.pill{
+  display:inline-block;
+  padding:4px 10px;
+  border-radius:999px;
+  background:#f1f1f1;
+  font-size:12px;
+  color:#333;
+  white-space:nowrap;
+}
+
+.section{ margin-top:6px; }
+.field{ margin-top:12px; }
+label{ display:block; font-weight:750; }
+input, select{
+  width:100%;
+  padding:10px;
+  margin-top:6px;
+  border-radius:12px;
+  border:1px solid #ccc;
+  font-size:14px;
+  background:#fff;
+}
+.hint{
+  display:block;
+  margin-top:6px;
+  color:var(--muted);
+  line-height:1.35;
+  font-size:12px;
+}
+
+.row{ display:flex; gap:10px; }
+.row > div{ flex:1; }
+
+.btn{
+  width:100%;
+  margin-top:16px;
+  padding:12px;
+  border-radius:var(--radius);
+  border:0;
+  font-weight:850;
+  background:var(--btn);
+  color:var(--btnText);
+  cursor:pointer;
+}
+.btn:disabled{ opacity:.55; cursor:not-allowed; }
+
+.btn--ghost{
+  background:transparent;
+  color:var(--text);
+  border:1px solid var(--border);
+  margin-top:10px;
+}
+
+.msg{
+  margin-top:10px;
+  min-height:20px;
+  font-weight:650;
+}
+.msg--err{ color:var(--danger); }
+.msg--ok{ color:var(--ok); }
+
+.footer{ margin-top:8px; }
+
+/* =========================
+   ✅ LEVEL 2: subject blocks
+   ========================= */
+
+.subjects{
+  margin-top:10px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:#fff;
+  overflow:hidden;
+}
+
+.subjects__loading{
+  padding:12px;
+  color:var(--muted);
+  font-weight:650;
+}
+
+.dayGroup{
+  border-top:1px solid var(--border);
+}
+.dayGroup:first-child{
+  border-top:0;
+}
+
+.dayHeader{
+  padding:10px 12px;
+  background:#f6f6f6;
+  font-weight:900;
+  font-size:13px;
+  color:#333;
+}
+
+.subjectItem{
+  width:100%;
+  border:0;
+  border-top:1px solid var(--border);
+  background:#fff;
+  padding:10px 12px;
+  text-align:left;
+  cursor:pointer;
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+}
+.subjectItem:first-of-type{
+  border-top:0;
+}
+
+.subjectItem:hover{
+  background:#fafafa;
+}
+
+.subjectItem.isActive{
+  background:#111;
+  color:#fff;
+}
+
+.subjectTime{
+  min-width:96px; /* ให้เวลาเรียงแนวเดียว */
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight:900;
+  font-size:12px;
+  opacity:.95;
+}
+
+.subjectMain{
+  flex:1;
+  min-width:0;
+}
+
+.subjectLine1{
+  font-weight:900;
+  font-size:13px;
+  line-height:1.2;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.subjectCode{
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.subjectTypePill{
+  font-size:11px;
+  padding:2px 8px;
+  border-radius:999px;
+  border:1px solid #dcdcdc;
+  background:#fff;
+  color:#111;
+  font-weight:900;
+}
+
+.subjectItem.isActive .subjectTypePill{
+  border-color: rgba(255,255,255,.4);
+  background: rgba(255,255,255,.12);
+  color:#fff;
+}
+
+.subjectName{
+  font-size:13px;
+  color:#333;
+  margin-top:3px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.subjectItem.isActive .subjectName{
+  color:#fff;
+  opacity:.95;
+}
+
+.selected{
+  margin-top:10px;
+  padding:10px 12px;
+  border:1px dashed var(--border);
+  border-radius:12px;
+  background:#fcfcfc;
+  font-size:13px;
+  line-height:1.35;
+}
+
+.selected b{
+  font-weight:950;
+}
+
