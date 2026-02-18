@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="th">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -44,17 +45,20 @@
         <label>ช่วงวันที่หยุด</label>
 
         <!-- ✅ FIX: เอา date-sep ออก เหลือแค่ 2 div -->
-        <div class="row">
-          <div>
+        <div class="row row--date">
+          <div class="date-col">
             <input id="startDate" type="date" lang="en-GB" placeholder="เลือกวันที่เริ่ม" />
             <small id="startDatePretty" class="hint"></small>
           </div>
 
-          <div>
+          <div class="date-sep">–</div>
+
+          <div class="date-col">
             <input id="endDate" type="date" lang="en-GB" placeholder="เลือกวันที่สิ้นสุด" />
             <small id="endDatePretty" class="hint"></small>
           </div>
         </div>
+
 
         <small class="hint">ถ้าหยุดวันเดียว เลือกแค่ช่องแรกได้เลย ✅</small>
       </div>
@@ -64,12 +68,8 @@
     <section id="cancelBox" class="section hidden">
       <div class="field">
         <label for="subjectSearch">ค้นหาวิชา</label>
-        <input
-          id="subjectSearch"
-          type="text"
-          placeholder="พิมพ์ค้นหา: รหัสวิชา / ชื่อ / วัน / เวลา / T / L"
-          autocomplete="off"
-        />
+        <input id="subjectSearch" type="text" placeholder="พิมพ์ค้นหา: รหัสวิชา / ชื่อ / วัน / เวลา / T / L"
+          autocomplete="off" />
         <small class="hint">แสดงเป็นบล็อค แยกตามวัน และเรียงตามเวลาเรียน ✅</small>
       </div>
 
@@ -99,4 +99,5 @@
 
   <script type="module" src="./js/main.js"></script>
 </body>
+
 </html>

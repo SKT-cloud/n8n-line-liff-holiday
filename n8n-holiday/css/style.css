@@ -244,3 +244,23 @@ input, select{
   font-weight:950;
 }
 
+/* ===== Fix Date Range Layout ===== */
+
+.row--date {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.row--date .date-col {
+  flex: 1;
+}
+
+.row--date .date-sep {
+  flex: 0 0 auto;      /* 🔥 ตัวนี้แหละที่กันไม่ให้มันยืด */
+  font-weight: 600;
+  opacity: 0.6;
+  padding: 0 4px;
+  user-select: none;
+}
+
