@@ -390,7 +390,11 @@ function bindUI(){
 // --- LIFF init (login-first) ---
 async function initLiffLoginFirst(){
   els.subtitle.textContent = "กำลังเริ่มต้น…";
-  await liff.init({ withLoginOnExternalBrowser: true });
+
+  await liff.init({
+    liffId: "2009146879-3eBGpF5j",
+    withLoginOnExternalBrowser: true
+  });
 
   if (!liff.isLoggedIn()) {
     els.subtitle.textContent = "กำลังพาไปล็อกอิน LINE…";
