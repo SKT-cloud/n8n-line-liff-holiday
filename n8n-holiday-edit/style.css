@@ -311,3 +311,12 @@ body{
   margin-top: 10px;
   flex-wrap: wrap;
 }
+
+/* Reminders history badges */
+.remHr{height:1px;background:rgba(0,0,0,.08);margin:10px 0;}
+.remHistoryTitle{font-size:12px;opacity:.7;margin-bottom:6px;}
+.remRow--readonly{align-items:center;}
+.remReadonlyText{flex:1;font-size:13px;opacity:.85;}
+.remBadge{font-size:11px;padding:4px 8px;border-radius:999px;background:rgba(0,0,0,.06);}
+.remBadge--sent{background:rgba(0,0,0,.10);}
+.remBadge--failed{background:rgba(0,0,0,.10);}

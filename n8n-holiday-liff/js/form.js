@@ -175,6 +175,24 @@ function pad2(n) {
   return String(n).padStart(2, "0");
 }
 
+function makeEmptyReminder() {
+  return { date: "", hour: "", minute: "" };
+}
+
+function getHHmmFromItem(it) {
+  const hRaw = String(it.hour ?? "").trim();
+  const mRaw = String(it.minute ?? "").trim();
+  if (!hRaw || !mRaw) return null;
+  const h = clampInt(hRaw, 0, 23);
+  const m = clampInt(mRaw, 0, 59);
+  if (h === null || m === null) return null;
+  return `${pad2(h)}:${pad2(m)}`;
+}
+
+function reminderItemOk(it) {
+  return !!(it && it.date && getHHmmFromItem(it));
+}
+
 /* ===== cancel-date day filter helpers ===== */
 const TH_DAY_TO_JS = {
   "อาทิตย์": 0,
@@ -209,16 +227,15 @@ export function initHolidayForm({ userId, displayName, subjectsUrl, submitUrl, o
   const remNoneBtn = qs("remNoneBtn");
   const remSetBtn = qs("remSetBtn");
   const remPicker = qs("remPicker");
-  const remDate = qs("remDate");
-  const remDatePretty = qs("remDatePretty");
-  const remHour = qs("remHour");
-  const remMinute = qs("remMinute");
+  const remListEl = qs("remList");
+  const remAddBtn = qs("remAddBtn");
 
   const state = {
     groups: [],
     selectedSubject: null,
     submitting: false,
-    reminderEnabled: false
+    reminderEnabled: false,
+    reminders: [] // [{date:'YYYY-MM-DD', hour:'09', minute:'00'}]
   };
 
   function setReminderUI(enabled) {
@@ -233,12 +250,18 @@ export function initHolidayForm({ userId, displayName, subjectsUrl, submitUrl, o
     remPicker.classList.toggle("hidden", !state.reminderEnabled);
 
     if (state.reminderEnabled) {
-      setTimeout(() => {
-        remHour.focus();
-        remHour.select();
-      }, 0);
-    }
+  if (state.reminders.length === 0) {
+    state.reminders.push(makeEmptyReminder());
   }
+  renderReminders();
+  setTimeout(() => {
+    const firstHour = remListEl.querySelector('input[data-role="hour"]');
+    if (firstHour) { firstHour.focus(); firstHour.select(); }
+  }, 0);
+} else {
+  renderReminders();
+}
+}
 
   function getReminderHHmm() {
     const hRaw = String(remHour.value ?? "").trim();
@@ -264,10 +287,7 @@ export function initHolidayForm({ userId, displayName, subjectsUrl, submitUrl, o
         ? !!(state.selectedSubject && cancelDateEl.value)
         : !!startDateEl.value;
 
-    const reminderOk =
-      !state.reminderEnabled
-        ? true
-        : !!(remDate.value && getReminderHHmm());
+    const reminderOk = !state.reminderEnabled ? true : (state.reminders.length > 0 && state.reminders.every(reminderItemOk));
 
     btn.disabled = !(modeOk && reminderOk);
   }
@@ -346,11 +366,8 @@ export function initHolidayForm({ userId, displayName, subjectsUrl, submitUrl, o
     const picker = getCancelPicker();
     if (picker) picker.set("disable", []);
 
-    // reset reminder: ไม่มีค่าเริ่มต้น
-    remDate.value = "";
-    remHour.value = "";
-    remMinute.value = "";
-    if (remDatePretty) remDatePretty.textContent = "";
+    // reset reminder
+    state.reminders = [];
     setReminderUI(false);
 
     if (state.groups.length) {
@@ -378,116 +395,214 @@ export function initHolidayForm({ userId, displayName, subjectsUrl, submitUrl, o
     validate();
   });
 
-  // ✅ UX: เวลา พิมพ์ง่าย + auto jump (เวอร์ชันแก้บัคแล้ว)
-  function enhanceTimeInput(inputEl, { max, onFull }) {
-    let freshFocus = false;
+// =========================
+// 🔔 Multi Reminders UI
+// =========================
+const reminderPickers = new Map(); // key -> flatpickr instance
 
-    inputEl.addEventListener("focus", () => {
-      freshFocus = true;
-      setTimeout(() => inputEl.select(), 0);
-    });
-
-    inputEl.addEventListener("keydown", (e) => {
-      const isDigit = e.key >= "0" && e.key <= "9";
-      const isControl =
-        e.key === "Backspace" ||
-        e.key === "Delete" ||
-        e.key === "ArrowLeft" ||
-        e.key === "ArrowRight" ||
-        e.key === "Tab";
-
-      if (isControl) return;
-
-      if (!isDigit) {
-        e.preventDefault();
-        return;
-      }
-
-      const hasSelection = inputEl.selectionStart !== inputEl.selectionEnd;
-
-      // เต็ม 2 ตัวแล้วและไม่ได้เลือก -> ไม่ให้พิมพ์เพิ่ม
-      if (!hasSelection && String(inputEl.value || "").length >= 2) {
-        e.preventDefault();
-        return;
-      }
-
-      // โฟกัสใหม่ แล้วยังไม่เลือกข้อความ (บางเครื่อง select ไม่ทัน) -> ล้างก่อนตัวแรก
-      if (freshFocus && !hasSelection) {
-        inputEl.value = "";
-      }
-      freshFocus = false;
-    });
-
-    inputEl.addEventListener("input", () => {
-      let v = String(inputEl.value || "").replace(/[^\d]/g, "");
-      if (v.length > 2) v = v.slice(0, 2);
-
-      if (v.length === 2) {
-        const n = clampInt(v, 0, max);
-        v = n === null ? "" : pad2(n);
-      }
-
-      inputEl.value = v;
-      validate();
-
-      if (inputEl.value.length === 2 && typeof onFull === "function") {
-        onFull();
-      }
-    });
-
-    inputEl.addEventListener("blur", () => {
-      const v = String(inputEl.value || "").trim();
-      if (!v) return;
-      const n = clampInt(v, 0, max);
-      inputEl.value = n === null ? "" : String(n);
-      validate();
-    });
+function destroyPicker(key) {
+  const inst = reminderPickers.get(key);
+  if (inst) {
+    try { inst.destroy(); } catch {}
+    reminderPickers.delete(key);
   }
+}
 
-  enhanceTimeInput(remHour, {
-    max: 23,
-    onFull: () => {
-      remMinute.focus();
-      remMinute.select();
-    }
-  });
+function renderReminders() {
+  // clear existing pickers safely (we'll recreate per row)
+  for (const [key] of reminderPickers.entries()) destroyPicker(key);
 
-  enhanceTimeInput(remMinute, {
-    max: 59,
-    onFull: () => {}
-  });
+  remListEl.innerHTML = "";
 
-  // date picker for reminder date
-  if (window.flatpickr) {
-    flatpickr(remDate, {
-      dateFormat: "Y-m-d",
-      altInput: true,
-      altFormat: "d/m/Y",
-      allowInput: false,
-      disableMobile: true,
-      minDate: "today",
-      onReady: (_, __, instance) => {
-        const lock = (el) => {
-          if (!el) return;
-          el.readOnly = true;
-          el.setAttribute("inputmode", "none");
-          el.setAttribute("autocomplete", "off");
-          el.addEventListener("keydown", (e) => e.preventDefault());
-          el.addEventListener("paste", (e) => e.preventDefault());
-        };
-        lock(instance.input);
-        lock(instance.altInput);
-      },
-      onChange: (_, dateStr) => {
-        if (remDatePretty) {
-          remDatePretty.textContent = dateStr ? `เลือก: ${prettyDMY(dateStr)}` : "";
+  if (!state.reminderEnabled) return;
+
+  state.reminders.forEach((it, idx) => {
+    const key = `rem_${idx}_${crypto.randomUUID?.() || String(Math.random()).slice(2)}`;
+
+    const wrap = document.createElement("div");
+    wrap.className = "remInlineItem";
+
+    const top = document.createElement("div");
+    top.className = "remInlineTop";
+
+    const t = document.createElement("div");
+    t.className = "remInlineTitle";
+    t.textContent = `แจ้งเตือน #${idx + 1}`;
+
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.className = "remRemoveBtn";
+    rm.textContent = "ลบ";
+    rm.title = "ลบการแจ้งเตือนนี้";
+    rm.onclick = () => {
+      state.reminders.splice(idx, 1);
+      renderReminders();
+      validate();
+    };
+
+    top.append(t, rm);
+    wrap.append(top);
+
+    const grid = document.createElement("div");
+    grid.className = "remInlineGrid";
+
+    // date
+    const dateCol = document.createElement("div");
+    dateCol.className = "date-col";
+
+    const dateLabel = document.createElement("label");
+    dateLabel.className = "miniLabel";
+    dateLabel.textContent = "📅 วันที่";
+
+    const dateInput = document.createElement("input");
+    dateInput.type = "text";
+    dateInput.readOnly = true;
+    dateInput.placeholder = "เลือกวันที่แจ้งเตือน";
+    dateInput.value = it.date || "";
+    dateInput.dataset.role = "date";
+
+    dateCol.append(dateLabel, dateInput);
+
+    const sep = document.createElement("div");
+    sep.className = "date-sep";
+    sep.textContent = "🕒";
+
+    // time
+    const timeCol = document.createElement("div");
+    timeCol.className = "date-col";
+
+    const timeLabel = document.createElement("label");
+    timeLabel.className = "miniLabel";
+    timeLabel.textContent = "เวลา";
+
+    const timeRow = document.createElement("div");
+    timeRow.className = "timeRow";
+
+    const hour = document.createElement("input");
+    hour.type = "number";
+    hour.min = "0"; hour.max = "23";
+    hour.inputMode = "numeric";
+    hour.placeholder = "09";
+    hour.value = it.hour || "";
+    hour.dataset.role = "hour";
+
+    const ts = document.createElement("span");
+    ts.className = "timeSep";
+    ts.textContent = ":";
+
+    const minute = document.createElement("input");
+    minute.type = "number";
+    minute.min = "0"; minute.max = "59";
+    minute.inputMode = "numeric";
+    minute.placeholder = "00";
+    minute.value = it.minute || "";
+    minute.dataset.role = "minute";
+
+    timeRow.append(hour, ts, minute);
+    timeCol.append(timeLabel, timeRow);
+
+    grid.append(dateCol, sep, timeCol);
+    wrap.append(grid);
+
+    remListEl.append(wrap);
+
+    // flatpickr on dateInput
+    if (window.flatpickr) {
+      const inst = flatpickr(dateInput, {
+        dateFormat: "Y-m-d",
+        altInput: true,
+        altFormat: "d/m/Y",
+        allowInput: false,
+        disableMobile: true,
+        minDate: "today",
+        onReady: (_, __, instance) => {
+          const lock = (el) => {
+            if (!el) return;
+            el.readOnly = true;
+            el.setAttribute("inputmode", "none");
+            el.setAttribute("autocomplete", "off");
+            el.addEventListener("keydown", (e) => e.preventDefault());
+            el.addEventListener("paste", (e) => e.preventDefault());
+          };
+          lock(instance.input);
+          lock(instance.altInput);
+        },
+        onChange: (_, dateStr) => {
+          it.date = dateStr || "";
+          validate();
         }
-        validate();
-      }
-    });
-  }
+      });
+      reminderPickers.set(key, inst);
+    }
 
-  // submit
+    // time behavior: 2-digit clamp + auto jump
+    function enhance(inputEl, max, onFull) {
+      let fresh = false;
+      inputEl.addEventListener("focus", () => {
+        fresh = true;
+        setTimeout(() => inputEl.select(), 0);
+      });
+
+      inputEl.addEventListener("keydown", (e) => {
+        const isDigit = e.key >= "0" && e.key <= "9";
+        const isControl =
+          e.key === "Backspace" || e.key === "Delete" ||
+          e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Tab";
+        if (isControl) return;
+        if (!isDigit) { e.preventDefault(); return; }
+
+        const hasSel = inputEl.selectionStart !== inputEl.selectionEnd;
+        if (!hasSel && String(inputEl.value || "").length >= 2) { e.preventDefault(); return; }
+        if (fresh && !hasSel) inputEl.value = "";
+        fresh = false;
+      });
+
+      inputEl.addEventListener("input", () => {
+        let v = String(inputEl.value || "").replace(/[^\d]/g, "");
+        if (v.length > 2) v = v.slice(0, 2);
+        if (v.length === 2) {
+          const n = clampInt(v, 0, max);
+          v = n === null ? "" : pad2(n);
+        }
+        inputEl.value = v;
+        if (inputEl === hour) it.hour = v;
+        if (inputEl === minute) it.minute = v;
+        validate();
+        if (v.length === 2 && typeof onFull === "function") onFull();
+      });
+
+      inputEl.addEventListener("blur", () => {
+        const v = String(inputEl.value || "").trim();
+        if (!v) return;
+        const n = clampInt(v, 0, max);
+        const out = n === null ? "" : String(n);
+        inputEl.value = out;
+        if (inputEl === hour) it.hour = out;
+        if (inputEl === minute) it.minute = out;
+        validate();
+      });
+    }
+
+    enhance(hour, 23, () => { minute.focus(); minute.select(); });
+    enhance(minute, 59, () => {});
+  });
+}
+
+remAddBtn.addEventListener("click", () => {
+  state.reminders.push(makeEmptyReminder());
+  renderReminders();
+  validate();
+
+  // focus the last hour
+  setTimeout(() => {
+    const rows = remListEl.querySelectorAll('input[data-role="hour"]');
+    const last = rows[rows.length - 1];
+    if (last) { last.focus(); last.select(); }
+  }, 0);
+});
+
+
+    // submit
   qs("submitBtn").addEventListener("click", async () => {
     if (state.submitting) return;
 
@@ -507,10 +622,14 @@ export function initHolidayForm({ userId, displayName, subjectsUrl, submitUrl, o
       const noteRaw = noteEl.value.trim();
       const note = noteRaw ? noteRaw : null;
 
-      const hhmm = state.reminderEnabled ? getReminderHHmm() : null;
       const reminders = state.reminderEnabled
-        ? [{ remind_at: `${remDate.value}T${hhmm}:00+07:00` }]
-        : [];
+  ? state.reminders
+      .filter(reminderItemOk)
+      .map((it) => {
+        const hhmm = getHHmmFromItem(it);
+        return { remind_at: `${it.date}T${hhmm}:00+07:00` };
+      })
+  : [];
 
       let payload;
 

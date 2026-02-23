@@ -106,30 +106,14 @@
       </div>
 
       <div id="remPicker" class="remPicker hidden">
-        <div class="row row--custom">
-          <div class="date-col">
-            <label class="miniLabel">📅 วันที่</label>
-            <input id="remDate" type="text" readonly placeholder="เลือกวันที่แจ้งเตือน" />
-            <small id="remDatePretty" class="hint"></small>
-          </div>
+  <div id="remList" class="remListInline" aria-label="รายการแจ้งเตือน"></div>
 
-          <div class="date-sep">🕒</div>
+  <div class="remInlineActions">
+    <button id="remAddBtn" type="button" class="btn btn--ghost remAddBtn">+ เพิ่มเวลาแจ้งเตือน</button>
+  </div>
 
-          <!-- ✅ เปลี่ยนจาก select → input ชั่วโมง/นาที -->
-          <div class="date-col">
-            <label class="miniLabel">เวลา</label>
-
-            <div class="timeRow">
-              <input id="remHour" type="number" min="0" max="23" inputmode="numeric" placeholder="09" />
-              <span class="timeSep">:</span>
-              <input id="remMinute" type="number" min="0" max="59" inputmode="numeric" placeholder="00" />
-            </div>
-
-            <small class="hint">รูปแบบ 24 ชม. เช่น 9:00 → ใส่ 9 และ 0</small>
-          </div>
-        </div>
-
-        <small class="hint">ห้ามเลือกย้อนหลัง • เลือกวัน/เวลาที่อยากให้เตือน ✅</small>
+  <small class="hint">ห้ามเลือกย้อนหลัง • ใส่ได้หลายเวลา ✅</small>
+</div>
       </div>
     </section>
 
@@ -137,7 +121,7 @@
 
     <div id="msg" class="msg"></div>
 
-    <div class="footer">
+    <div class="footer" style="margin-top:10px;">
       <button id="resetBtn" class="btn btn--ghost" type="button">ล้างฟอร์ม</button>
     </div>
   </div>

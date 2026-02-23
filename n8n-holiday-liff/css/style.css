@@ -86,11 +86,12 @@ input, select, textarea{
 
 .btn{
   width:100%;
-  margin-top:16px;
-  padding:12px;
+  margin-top:14px;
+  padding:10px 14px;
   border-radius:var(--radius);
   border:0;
   font-weight:850;
+  font-size:14px;
   background:var(--btn);
   color:var(--btnText);
   cursor:pointer;
@@ -99,6 +100,7 @@ input, select, textarea{
 
 .btn--ghost{
   background:transparent;
+  padding:9px 12px;
   color:var(--text);
   border:1px solid var(--border);
   margin-top:10px;
@@ -417,11 +419,14 @@ input, select, textarea{
   margin-top:8px;
   display:flex;
   gap:10px;
+  background:rgba(0,0,0,.04);
+  padding:6px;
+  border-radius:16px;
 }
 
 .segBtn{
   width:50%;
-  padding:10px 12px;
+  padding:9px 12px;
   border-radius:14px;
   border:1px solid var(--border);
   background:#fff;
@@ -475,3 +480,56 @@ input, select, textarea{
   font-weight:900;
   opacity:.7;
 }
+/* =========================
+   🔔 Multi reminders (Add page)
+   ========================= */
+.remListInline{
+  margin-top:10px;
+  display:grid;
+  gap:10px;
+}
+.remInlineItem{
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:12px;
+  background:#fff;
+}
+.remInlineTop{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px;
+}
+.remInlineTitle{
+  font-weight:900;
+  font-size:13px;
+  opacity:.9;
+}
+.remRemoveBtn{
+  width:auto;
+  margin:0;
+  padding:8px 10px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  background:transparent;
+  cursor:pointer;
+  font-weight:900;
+}
+.remRemoveBtn:hover{ background:#fafafa; }
+.remInlineGrid{
+  display:grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap:12px;
+  align-items:start;
+}
+.remInlineGrid .date-sep{
+  align-self:center;
+  font-weight:900;
+  opacity:.7;
+  padding:0 4px;
+  user-select:none;
+  margin-top: 18px;
+}
+.remInlineActions{ margin-top:10px; }
+.remAddBtn{ margin-top:0; }

@@ -47,7 +47,8 @@ const state = {
   range: { from: null, to: null },
   reminderEdits: new Map(),      // holidayId -> array of remind_at ISO strings
   reminderOriginal: new Map(),   // holidayId -> original array
-  modalReminders: [],            // temp for modal editor
+  modalReminders: [],            // temp for modal editor (editable: pending only)
+  modalReminderHistory: [],     // non-pending history (readonly)
 };
 
 function toast(msg, ms = 1600) {
@@ -153,6 +154,15 @@ function isoToLocalInput(iso) {
 }
 
 // Convert <input type="datetime-local"> -> ISO with +07:00 (seconds forced :00)
+function fmtIsoThai(iso) {
+  if (!iso || typeof iso !== "string") return "-";
+  const ymd = iso.slice(0, 10);
+  const hhmm = iso.slice(11, 16);
+  // dd/mm/yyyy hh:mm
+  const [y, m, d] = ymd.split("-");
+  return `${d}/${m}/${y} ${hhmm} น.`;
+}
+
 function localInputToIsoBkk(v) {
   if (!v) return null;
   // Expect: YYYY-MM-DDTHH:mm
@@ -163,55 +173,108 @@ function localInputToIsoBkk(v) {
 async function loadRemindersForHoliday(holidayId) {
   const data = await apiFetch(`/liff/holidays/reminders/list?holiday_id=${encodeURIComponent(holidayId)}`);
   const arr = data?.items || [];
-  // keep only pending (allow editing). Sent/failed shown but locked (optional) — for now ignore non-pending.
-  const pending = arr.filter(x => (x.status || "pending") === "pending").map(x => x.remind_at).filter(Boolean);
-  return pending;
-}
 
+  const pending = [];
+  const history = [];
+
+  for (const x of arr) {
+    const st = (x.status || "pending").toLowerCase();
+    const iso = x.remind_at;
+    if (!iso) continue;
+    if (st === "pending" || st === "sending") pending.push(iso);
+    else history.push({ remind_at: iso, status: st });
+  }
+
+  // unique + sort (defensive)
+  const uniq = Array.from(new Set(pending)).sort();
+
+  // sort history by time
+  history.sort((a, b) => String(a.remind_at).localeCompare(String(b.remind_at)));
+
+  return { pending: uniq, history };
+}
 function renderRemindersEditor() {
   const wrap = els.mRemindersList;
   if (!wrap) return;
   wrap.innerHTML = "";
 
-  if (!state.modalReminders || state.modalReminders.length === 0) {
+  const editable = Array.isArray(state.modalReminders) ? state.modalReminders : [];
+  const history = Array.isArray(state.modalReminderHistory) ? state.modalReminderHistory : [];
+
+  if (editable.length === 0) {
     const empty = document.createElement("div");
     empty.className = "remEmpty";
-    empty.textContent = "ยังไม่มีการตั้งแจ้งเตือน";
+
+    if (history.length > 0) {
+      empty.textContent = "ไม่มีแจ้งเตือนที่แก้ไขได้ (รายการนี้อาจถูกส่งไปแล้ว)";
+    } else {
+      empty.textContent = "ยังไม่มีการตั้งแจ้งเตือน";
+    }
+
     wrap.append(empty);
-    return;
+  } else {
+    editable.forEach((iso, idx) => {
+      const row = document.createElement("div");
+      row.className = "remRow";
+
+      const inp = document.createElement("input");
+      inp.type = "datetime-local";
+      inp.className = "input remInput";
+      inp.value = isoToLocalInput(iso);
+      inp.onchange = () => {
+        const nextIso = localInputToIsoBkk(inp.value);
+        if (!nextIso) {
+          toast("รูปแบบเวลาไม่ถูกต้อง");
+          inp.value = isoToLocalInput(editable[idx]);
+          return;
+        }
+        editable[idx] = nextIso;
+        state.modalReminders = editable;
+      };
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "iconBtn deleteBtn";
+      btn.title = "ลบเวลาแจ้งเตือนนี้";
+      btn.innerHTML = "🗑️";
+      btn.onclick = () => {
+        editable.splice(idx, 1);
+        state.modalReminders = editable;
+        renderRemindersEditor();
+      };
+
+      row.append(inp, btn);
+      wrap.append(row);
+    });
   }
 
-  state.modalReminders.forEach((iso, idx) => {
-    const row = document.createElement("div");
-    row.className = "remRow";
+  // ✅ History (sent/failed) — readonly
+  if (history.length > 0) {
+    const hr = document.createElement("div");
+    hr.className = "remHr";
+    wrap.append(hr);
 
-    const inp = document.createElement("input");
-    inp.type = "datetime-local";
-    inp.className = "input remInput";
-    inp.value = isoToLocalInput(iso);
-    inp.onchange = () => {
-      const nextIso = localInputToIsoBkk(inp.value);
-      if (!nextIso) {
-        toast("รูปแบบเวลาไม่ถูกต้อง");
-        inp.value = isoToLocalInput(state.modalReminders[idx]);
-        return;
-      }
-      state.modalReminders[idx] = nextIso;
-    };
+    const title = document.createElement("div");
+    title.className = "remHistoryTitle";
+    title.textContent = "ประวัติแจ้งเตือน (แก้ไม่ได้)";
+    wrap.append(title);
 
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "iconBtn deleteBtn";
-    btn.title = "ลบเวลาแจ้งเตือนนี้";
-    btn.innerHTML = "🗑️";
-    btn.onclick = () => {
-      state.modalReminders.splice(idx, 1);
-      renderRemindersEditor();
-    };
+    history.forEach((x) => {
+      const row = document.createElement("div");
+      row.className = "remRow remRow--readonly";
 
-    row.append(inp, btn);
-    wrap.append(row);
-  });
+      const txt = document.createElement("div");
+      txt.className = "remReadonlyText";
+      txt.textContent = fmtIsoThai(x.remind_at);
+
+      const badge = document.createElement("div");
+      badge.className = `remBadge remBadge--${x.status}`;
+      badge.textContent = x.status === "sent" ? "ส่งแล้ว" : (x.status === "failed" ? "ส่งไม่สำเร็จ" : x.status);
+
+      row.append(txt, badge);
+      wrap.append(row);
+    });
+  }
 }
 
 // Compare reminders arrays ignoring order
@@ -342,17 +405,20 @@ async function openModal(id) {
   els.btnDeleteOne.hidden = deleted;
   els.btnUndoDelete.hidden = !deleted;
 
-  // ✅ Load reminders for this holiday (pending only)
-  try {
-    const original = await loadRemindersForHoliday(id);
-    state.reminderOriginal.set(id, original);
+  // ✅ Load reminders for this holiday
+try {
+  const { pending, history } = await loadRemindersForHoliday(id);
+  state.reminderOriginal.set(id, pending);
+  state.modalReminderHistory = history || [];
 
-    // if already edited, prefer edited list
-    const edited = state.reminderEdits.get(id);
-    state.modalReminders = (edited ? edited.slice() : original.slice());
-  } catch (e) {
+  // if already edited, prefer edited list
+  const edited = state.reminderEdits.get(id);
+  state.modalReminders = (edited ? edited.slice() : pending.slice());
+} catch (e) {
+
     console.error(e);
     state.modalReminders = [];
+    state.modalReminderHistory = [];
     toast(`โหลดแจ้งเตือนไม่สำเร็จ: ${e.message}`);
   }
 
