@@ -1,110 +1,96 @@
-import { CONFIG } from "./config.js";
 import { initLiff } from "./auth.js";
 import { fetchSubjects, createHoliday } from "./api.js";
+import { CONFIG } from "./config.js";
 import { initForm } from "./form.js";
 
 const $ = (s) => document.querySelector(s);
 
-function toast(msg, kind = "info") {
-  const el = $("#toast");
-  el.textContent = msg;
-  el.className = `toast ${kind}`;
-  el.hidden = false;
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => (el.hidden = true), 2800);
+function setStatus(text) {
+  const el = $("#status");
+  if (!el) return;
+  el.textContent = text || "";
 }
 
-function setStatus(text) {
-  $("#status").textContent = text || "";
+function toast(msg, kind = "info") {
+  const el = $("#toast");
+  if (!el) return;
+  el.hidden = false;
+  el.textContent = msg;
+
+  // style by kind (เบา ๆ)
+  el.style.borderColor = kind === "err" ? "rgba(239,68,68,.28)" : "rgba(15,23,42,.10)";
+  el.style.background = kind === "err" ? "rgba(254,242,242,.92)" : "rgba(255,255,255,.94)";
+
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => (el.hidden = true), 2600);
 }
 
 async function run() {
   try {
-    setStatus("กำลังเปิดฟอร์ม...");
+    setStatus("กำลังเปิดฟอร์ม…");
 
-    const { idToken, profile } = await initLiff();
-    if (!idToken) return; // login redirected
+    const session = await initLiff();
+    if (!session) return; // login redirect
+    const { idToken, profile } = session;
 
-    $("#userPill").textContent = profile?.displayName ? `คุณ ${profile.displayName}` : "คุณ";
+    // Show profile name
+    const profileEl = $("#profileName");
+    if (profileEl) profileEl.textContent = profile?.displayName || "ผู้ใช้";
 
-    setStatus("กำลังโหลดตารางวิชา...");
-    const items = await fetchSubjects({ idToken });
+    // Mode badge
+    const badge = $("#badge");
+    if (badge) badge.textContent = CONFIG.getMode() === "edit" ? "Edit" : "Add";
 
-    // Render subjects
-    const list = $("#subjectList");
-    list.innerHTML = "";
+    // Load subjects
+    const subjectsStatus = $("#subjectsStatus");
+    if (subjectsStatus) subjectsStatus.textContent = "กำลังโหลดรายวิชา…";
 
-    if (!items.length) {
-      list.innerHTML = `<div class="empty">ยังไม่มีข้อมูลวิชาในระบบ 😅</div>`;
-    } else {
-      const grouped = new Map();
-      for (const it of items) {
-        const day = it.day || "อื่นๆ";
-        if (!grouped.has(day)) grouped.set(day, []);
-        grouped.get(day).push(it);
-      }
-      const daySort = (d) => {
-        const order = ["จันทร์","อังคาร","พุธ","พฤหัสบดี","พฤ","ศุกร์","เสาร์","อาทิตย์","อื่นๆ"];
-        const i = order.indexOf(d);
-        return i === -1 ? 999 : i;
-      };
+    const subjects = await fetchSubjects({ idToken });
 
-      [...grouped.entries()].sort((a,b)=>daySort(a[0]) - daySort(b[0])).forEach(([day, arr]) => {
-        arr.sort((a,b) => String(a.start_time||"").localeCompare(String(b.start_time||"")) || String(a.subject_code||"").localeCompare(String(b.subject_code||"")));
-        const sec = document.createElement("section");
-        sec.className = "dayGroup";
-        sec.innerHTML = `<div class="dayHead">${day}</div>`;
-        const grid = document.createElement("div");
-        grid.className = "subGrid";
-        for (const s of arr) {
-          const payload = {
-            subject_code: s.subject_code,
-            subject_name: s.subject_name,
-            section: s.section,
-            type: s.type,
-            room: s.room,
-            start_time: s.start_time,
-            end_time: s.end_time,
-            day: s.day,
-            semester: s.semester,
-            instructor: s.instructor,
-          };
-          const card = document.createElement("button");
-          card.type = "button";
-          card.className = "subCard";
-          card.dataset.key = `${s.day}|${s.start_time}|${s.subject_code}|${s.section}|${s.type}`;
-          card.dataset.payload = JSON.stringify(payload);
-          card.innerHTML = `
-            <div class="subTime">${(s.start_time||"??:??")}–${(s.end_time||"??:??")}</div>
-            <div class="subCode">${s.subject_code || ""} <span class="subType">${s.type || ""}</span></div>
-            <div class="subName">${s.subject_name || ""}</div>
-            <div class="subMeta">${s.room ? `ห้อง ${s.room}` : ""}</div>
-          `;
-          grid.appendChild(card);
-        }
-        sec.appendChild(grid);
-        list.appendChild(sec);
-      });
+    if (subjectsStatus) {
+      subjectsStatus.textContent = subjects.length ? `มี ${subjects.length} รายวิชา` : "ยังไม่มีรายวิชาในระบบ";
     }
 
     setStatus("");
 
-    // Bind form actions
+    // Mount initForm (ใช้ UI + logic ที่คุณทำไว้ใน form.js)
     initForm({
-      onSubmit: async (payload) => {
-        setStatus("กำลังบันทึก...");
-        const res = await createHoliday({ idToken, payload });
-        toast("บันทึกสำเร็จ ✅", "ok");
-        setStatus("");
+      el: document,
+      mode: CONFIG.getMode(),
+      profile,
+      subjects,
 
-        // close LIFF after save
-        try { window.liff.closeWindow(); } catch(_) {}
+      onSubmit: async (payload) => {
+        try {
+          setStatus("กำลังบันทึก…");
+
+          // form.js ส่ง subject เป็น object (ถ้าเป็น cancel)
+          // แต่ Worker ต้องการ subject_id
+          const subject_id = payload?.subject ? (payload.subject.id ?? null) : null;
+
+          const finalPayload = {
+            type: payload.type,
+            title: payload.title,
+            note: payload.note,
+            start_at: payload.start_at,
+            end_at: payload.end_at,
+            all_day: payload.all_day ?? 1,
+            subject_id,
+            reminders: payload.reminders || [],
+          };
+
+          await createHoliday({ idToken, payload: finalPayload });
+
+          setStatus("");
+          toast("บันทึกสำเร็จ ✅", "ok");
+
+          try { window.liff.closeWindow(); } catch (_) {}
+        } catch (e) {
+          console.error(e);
+          setStatus("");
+          toast(e?.message || String(e), "err");
+        }
       },
-      onError: (err) => {
-        console.error(err);
-        toast(err?.message || String(err), "err");
-        setStatus("");
-      }
     });
 
   } catch (e) {

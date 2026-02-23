@@ -2,83 +2,111 @@
 <html lang="th">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>StudyBot • เพิ่มวันหยุด / ยกคลาส</title>
+
   <link rel="stylesheet" href="/css/style.css" />
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
+
 <body>
   <div class="bg" aria-hidden="true"></div>
 
   <main class="wrap">
+    <!-- Top -->
     <header class="topbar">
-      <div>
-        <h1>เพิ่มวันหยุด</h1>
-        <p class="sub">บันทึกวันหยุดทั้งวัน หรือยกคลาส (เลือกวิชา) พร้อมแจ้งเตือนหลายเวลา</p>
+      <div class="brand">
+        <div class="h1">เพิ่มวันหยุด</div>
+        <div class="sub">หยุดทั้งวัน หรือยกคลาส (เลือกวิชา) พร้อมแจ้งเตือนหลายเวลา</div>
       </div>
-      <div class="pill" id="profilePill">กำลังเชื่อมต่อ…</div>
+
+      <div class="chips">
+        <div class="chip" id="badge">Add</div>
+        <div class="chip" id="profileName">กำลังเชื่อมต่อ…</div>
+      </div>
     </header>
 
+    <!-- Card -->
     <section class="card">
-      <div class="grid">
+      <!-- Status line (optional, กัน error) -->
+      <div id="status" class="status" aria-live="polite"></div>
+
+      <!-- FORM (สำคัญ: form.js ฟัง submit ที่ element นี้) -->
+      <form id="holidayForm" class="grid">
+        <!-- Type Segmented -->
         <div class="field">
-          <label for="title">หัวข้อ <span class="muted">(ไม่จำเป็น)</span></label>
+          <div class="label">ประเภท</div>
+          <div class="seg">
+            <button id="btnTypeHoliday" class="segBtn isActive" type="button">หยุดทั้งวัน</button>
+            <button id="btnTypeCancel" class="segBtn" type="button">ยกคลาส</button>
+          </div>
+          <div class="help">ถ้าเลือก “ยกคลาส” ต้องเลือกวิชาจากด้านล่าง</div>
+        </div>
+
+        <!-- Title -->
+        <div class="field">
+          <label class="label" for="title">หัวข้อ <span class="muted">(ไม่จำเป็น)</span></label>
           <input id="title" type="text" placeholder="เช่น ไปอบรม / ป่วย" maxlength="120" />
         </div>
 
+        <!-- Note -->
         <div class="field">
-          <label for="note">หมายเหตุ <span class="muted">(ไม่จำเป็น)</span></label>
+          <label class="label" for="note">หมายเหตุ <span class="muted">(ไม่จำเป็น)</span></label>
           <textarea id="note" rows="3" placeholder="เช่น สถานที่ / เหตุผล / รายละเอียดเพิ่มเติม" maxlength="500"></textarea>
         </div>
 
+        <!-- Date -->
         <div class="field">
-          <label for="type">ประเภท</label>
-          <select id="type">
-            <option value="holiday">หยุดทั้งวัน</option>
-            <option value="cancel">ยกคลาส (เลือกวิชา)</option>
-          </select>
-          <div class="hint" id="typeHint">ถ้าเลือก “ยกคลาส” จะต้องเลือกวิชาจากตารางด้านล่าง</div>
-        </div>
-
-        <div class="field">
-          <label>ช่วงวันที่หยุด</label>
-          <div class="row">
-            <input id="startDate" type="date" />
-            <span class="dash">–</span>
-            <input id="endDate" type="date" />
+          <div class="label">ช่วงวันที่หยุด</div>
+          <div class="row2">
+            <div class="field">
+              <label class="mini" for="startDate">วันเริ่ม</label>
+              <input id="startDate" type="date" />
+            </div>
+            <div class="field">
+              <label class="mini" for="endDate">วันสุดท้าย (เว้นได้)</label>
+              <input id="endDate" type="date" />
+            </div>
           </div>
-          <div class="hint">ถ้าหยุดวันเดียว ปล่อยช่อง “วันที่สุดสุด” ว่างได้ ✅</div>
+          <div class="help">ถ้าหยุดวันเดียว ปล่อย “วันสุดท้าย” ว่างได้ ✅</div>
         </div>
-      </div>
 
-      <div class="divider"></div>
-
-      <div class="sectionHeader">
-        <h2>แจ้งเตือน</h2>
-        <div class="sectionActions">
-          <button class="btn ghost" id="addReminderBtn" type="button">＋ เพิ่มเวลาแจ้งเตือน</button>
-          <button class="btn ghost danger" id="clearRemindersBtn" type="button">ล้างแจ้งเตือน</button>
+        <!-- Reminders -->
+        <div class="sectionHead">
+          <div>
+            <div class="h2">แจ้งเตือน</div>
+            <div class="help">ถ้าไม่เพิ่มเวลาแจ้งเตือน = ไม่แจ้งเตือน</div>
+          </div>
+          <button id="addReminder" class="btn ghost" type="button">＋ เพิ่มเวลา</button>
         </div>
-      </div>
 
-      <div id="remindersWrap" class="reminders"></div>
-      <div class="hint">ถ้าไม่เพิ่มเวลาแจ้งเตือน = ไม่แจ้งเตือน</div>
+        <div id="remindersList" class="remBox"></div>
 
-      <div class="divider"></div>
+        <!-- Cancel section -->
+        <div id="cancelBox" class="cancelBox" hidden>
+          <div class="sectionHead">
+            <div>
+              <div class="h2">ตารางวิชา</div>
+              <div class="help" id="subjectsStatus">กำลังโหลดรายวิชา…</div>
+            </div>
+            <div class="picked">
+              <span class="muted">เลือกแล้ว:</span>
+              <span id="selectedSubject" class="pickedName">-</span>
+            </div>
+          </div>
 
-      <div class="sectionHeader" id="subjectsHeader">
-        <h2>ตารางวิชา</h2>
-        <div class="hint" id="subjectsStatus">กำลังโหลดรายวิชา…</div>
-      </div>
+          <div id="subjectList" class="subjectList"></div>
+        </div>
 
-      <div id="subjectsWrap" class="subjects"></div>
+        <!-- Actions -->
+        <div class="actions">
+          <button id="resetBtn" class="btn" type="button">ล้างฟอร์ม</button>
+          <button class="btn primary" type="submit">บันทึก</button>
+        </div>
+      </form>
 
-      <div class="actions">
-        <button class="btn soft" id="resetBtn" type="button">ล้างฟอร์ม</button>
-        <button class="btn primary" id="saveBtn" type="button">บันทึก</button>
-      </div>
-
-      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      <!-- Toast -->
+      <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     </section>
 
     <footer class="foot">StudyBot • LIFF</footer>
