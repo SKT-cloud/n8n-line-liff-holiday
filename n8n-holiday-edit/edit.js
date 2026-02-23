@@ -1,10 +1,11 @@
 // edit.js — LIFF Holiday Edit/Delete (minimal white)
 // ✅ บังคับ Login LINE ก่อน
-// ✅ หลัง login: getProfile().userId -> ใช้ดึง list เฉพาะของตัวเอง
-// ✅ แก้/ลบหลายรายการ + save ทีเดียว (ลอง batch ก่อน, fallback update/delete)
+// ✅ หลัง login: getProfile().userId -> แสดง label
+// ✅ เรียก Worker ด้วย LIFF idToken -> Worker จะล็อก userId ให้เอง
+// ✅ แก้/ลบหลายรายการ + save ทีเดียว (batch)
 
+// ✅ เหลือแค่ API Base พอ (ไม่ใช้ API KEY แล้ว)
 const LS_API_BASE = "holiday_api_base";
-const LS_API_KEY  = "holiday_api_key";
 
 const els = {
   subtitle: document.getElementById("subtitle"),
@@ -19,7 +20,6 @@ const els = {
 
   settingsPanel: document.getElementById("settingsPanel"),
   apiBase: document.getElementById("apiBase"),
-  apiKey: document.getElementById("apiKey"),
   btnSaveSettings: document.getElementById("btnSaveSettings"),
   btnClearSettings: document.getElementById("btnClearSettings"),
 
@@ -44,13 +44,10 @@ const els = {
 
 const state = {
   userId: null,
-
   items: [],
   edits: new Map(),    // id -> partial update payload
   deletes: new Set(),  // ids marked delete
-
   currentId: null,
-
   range: { from: null, to: null },
 };
 
@@ -67,21 +64,25 @@ function ymd(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.get
 function getApiBase(){
   return (localStorage.getItem(LS_API_BASE) || "").trim().replace(/\/+$/,"");
 }
-function getApiKey(){
-  return (localStorage.getItem(LS_API_KEY) || "").trim();
-}
-function setSettings(base, key){
+function setApiBase(base){
   localStorage.setItem(LS_API_BASE, (base||"").trim());
-  localStorage.setItem(LS_API_KEY, (key||"").trim());
+}
+
+function getIdTokenOrThrow(){
+  const token = liff.getIDToken?.();
+  if (!token) throw new Error("ยังไม่ได้เปิด scope openid หรือยังไม่พร้อมใช้งาน idToken");
+  return token;
 }
 
 async function apiFetch(path, { method="GET", body=null } = {}) {
   const base = getApiBase();
   if (!base) throw new Error("ยังไม่ตั้งค่า API Base");
 
-  const headers = { "Content-Type": "application/json" };
-  const key = getApiKey();
-  if (key) headers["Authorization"] = `Bearer ${key}`;
+  const idToken = getIdTokenOrThrow();
+  const headers = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${idToken}`,
+  };
 
   const res = await fetch(`${base}${path}`, {
     method,
@@ -137,11 +138,8 @@ function updateFooter(){
 function render(){
   els.list.innerHTML = "";
 
-  if (!state.items.length) {
-    els.empty.hidden = false;
-  } else {
-    els.empty.hidden = true;
-  }
+  if (!state.items.length) els.empty.hidden = false;
+  else els.empty.hidden = true;
 
   for (const it of state.items) {
     const deleted = state.deletes.has(it.id);
@@ -154,7 +152,6 @@ function render(){
     let note  = ("note" in pending) ? pending.note : it.note;
 
     const icon = iconForType(it.type);
-
     const titleLine =
       it.type === "holiday"
         ? (title ? `${icon} วันหยุด: ${title}` : `${icon} วันหยุด`)
@@ -278,8 +275,8 @@ function applyModal(){
 
   const note = noteRaw ? noteRaw : null;
 
-  // เก็บเฉพาะ field ที่เปลี่ยนจริง
-  const changed = { user_id: state.userId, id };
+  // เก็บเฉพาะ field ที่เปลี่ยนจริง (ไม่ต้องส่ง user_id แล้ว)
+  const changed = { id };
   let dirty = false;
 
   if (start_at !== it.start_at) { changed.start_at = start_at; dirty = true; }
@@ -315,13 +312,12 @@ async function loadList(){
   els.rangeLabel.textContent = `${from} → ${to}`;
   els.userLabel.textContent = state.userId ? state.userId : "—";
 
-  // ✅ ดึงด้วย userId ของตัวเองเท่านั้น
-  const url = `/holidays/list?user_id=${encodeURIComponent(state.userId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  // ✅ เปลี่ยนเป็น LIFF endpoint (ไม่ส่ง user_id)
+  const url = `/liff/holidays/list?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
 
   const data = await apiFetch(url);
   const arr = Array.isArray(data) ? data : (data.items || data.holidays || []);
   state.items = arr.map(normalizeItem).filter(x => x.id != null);
-
   state.items.sort((a,b) => (a.start_at || "").localeCompare(b.start_at || ""));
 
   // reset draft เมื่อโหลดใหม่
@@ -333,39 +329,20 @@ async function loadList(){
   render();
 }
 
-async function tryBatchSave(updates, deletes){
-  // จะใช้ตอนเราไปทำ Worker ต่อ
-  return await apiFetch(`/holidays/batch`, {
-    method: "POST",
-    body: { user_id: state.userId, updates, deletes },
-  });
-}
-
 async function saveAll(){
   if (!isDirty()) return;
 
   els.btnSave.disabled = true;
   toast("กำลังบันทึก…");
 
-  const updates = Array.from(state.edits.values());
-  const deletes = Array.from(state.deletes.values());
+  const updates = Array.from(state.edits.values()); // [{id, ...fields}]
+  const deletes = Array.from(state.deletes.values()); // [id, id, ...]
 
   try {
-    try {
-      await tryBatchSave(updates, deletes);
-    } catch (e) {
-      // ถ้ายังไม่มี batch/update ใน worker จะตกมาฟอลแบ็ค (และอาจยัง error)
-      if (e.status !== 404 && e.status !== 405) throw e;
-
-      const tasks = [];
-      for (const u of updates) {
-        tasks.push(apiFetch(`/holidays/update`, { method:"POST", body: u }));
-      }
-      for (const id of deletes) {
-        tasks.push(apiFetch(`/holidays/delete`, { method:"POST", body: { user_id: state.userId, id } }));
-      }
-      await Promise.all(tasks);
-    }
+    await apiFetch(`/liff/holidays/batch`, {
+      method: "POST",
+      body: { updates, deletes },
+    });
 
     toast("บันทึกสำเร็จ ✅🎉", 1800);
     els.subtitle.textContent = "บันทึกสำเร็จ ✅";
@@ -393,21 +370,19 @@ async function saveAll(){
 // --- settings UI ---
 function initSettingsUI(){
   els.apiBase.value = localStorage.getItem(LS_API_BASE) || "";
-  els.apiKey.value  = localStorage.getItem(LS_API_KEY) || "";
 
   els.btnSettings.onclick = () => {
     els.settingsPanel.hidden = !els.settingsPanel.hidden;
   };
 
   els.btnSaveSettings.onclick = () => {
-    setSettings(els.apiBase.value, els.apiKey.value);
+    setApiBase(els.apiBase.value);
     toast("บันทึกตั้งค่าแล้ว ✅");
   };
 
   els.btnClearSettings.onclick = () => {
-    setSettings("", "");
+    setApiBase("");
     els.apiBase.value = "";
-    els.apiKey.value = "";
     toast("ล้างตั้งค่าแล้ว");
   };
 }
@@ -456,13 +431,15 @@ async function initLiffLoginFirst(){
   // ✅ บังคับ Login ก่อนใช้งาน
   if (!liff.isLoggedIn()) {
     els.subtitle.textContent = "กำลังพาไปล็อกอิน LINE…";
-    // จะ redirect ไป login แล้วกลับมา URL เดิม
     liff.login({ redirectUri: window.location.href });
-    return; // stop here
+    return;
   }
 
   const profile = await liff.getProfile();
   state.userId = profile.userId;
+
+  // บังคับว่าต้องมี idToken (ต้องเปิด scope openid)
+  getIdTokenOrThrow();
 
   els.userLabel.textContent = state.userId;
   els.subtitle.textContent = "พร้อมใช้งาน ✅";
@@ -484,7 +461,6 @@ async function initLiffLoginFirst(){
   try {
     await initLiffLoginFirst();
 
-    // หลัง login แล้วค่อยโหลด (ถ้าตั้งค่า API Base แล้ว)
     if (!state.userId) return; // ตอน redirect ไป login
 
     if (!getApiBase()) {
