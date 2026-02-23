@@ -99,6 +99,7 @@ body{
   background: var(--card);
   box-shadow: var(--shadow);
   padding: 14px;
+  position: relative; /* ✅ ให้ปุ่ม icon วาง absolute */
 }
 
 .card.deleted{
@@ -137,13 +138,6 @@ body{
   font-size: 12px;
   color: var(--muted);
   line-height: 1.45;
-}
-
-.cardBtns{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  justify-content:flex-end;
 }
 
 .btn{
@@ -248,4 +242,39 @@ body{
   border-radius: var(--radius);
   padding: 18px;
   margin-top: 16px;
+}
+
+/* ✅ ปุ่ม icon ขวาล่าง */
+.cardActions{
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.iconBtn{
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  cursor: pointer;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .15s ease;
+}
+
+.iconBtn:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.1);
+}
+
+.editBtn:hover{ background: #f3f4f6; }
+
+.deleteBtn:hover{
+  background: #fee2e2;
+  border-color: #fecaca;
 }

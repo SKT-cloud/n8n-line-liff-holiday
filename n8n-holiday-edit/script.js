@@ -1,4 +1,4 @@
-// edit.js — Production (no settings UI)
+// script.js — Production (no settings UI)
 // ✅ Login LINE ก่อน
 // ✅ เรียก Worker ด้วย LIFF idToken
 // ✅ ดึง/แก้/ลบผ่าน /liff/holidays/*
@@ -6,6 +6,7 @@
 
 // ===== PRODUCTION CONFIG =====
 const API_BASE = "https://study-holiday-api.suwijuck-kat.workers.dev";
+const LIFF_ID = "2009146879-3eBGpF5j";
 // =============================
 
 const els = {
@@ -49,16 +50,16 @@ function toast(msg, ms = 1600) {
   toast._t = window.setTimeout(() => els.toast.classList.remove("show"), ms);
 }
 
-function pad2(n){ return String(n).padStart(2,"0"); }
-function ymd(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+function pad2(n) { return String(n).padStart(2, "0"); }
+function ymd(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
 
-function getIdTokenOrThrow(){
+function getIdTokenOrThrow() {
   const token = liff.getIDToken?.();
   if (!token) throw new Error("ไม่พบ idToken (ตรวจว่า LIFF เปิด scope openid แล้ว)");
   return token;
 }
 
-async function apiFetch(path, { method="GET", body=null } = {}) {
+async function apiFetch(path, { method = "GET", body = null } = {}) {
   const idToken = getIdTokenOrThrow();
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -83,58 +84,56 @@ async function apiFetch(path, { method="GET", body=null } = {}) {
 }
 
 // --- normalize ---
-function inferType(it){
+function inferType(it) {
   const t = (it.mode || it.type || it.kind || "").toString();
   if (t.includes("cancel")) return "cancel";
   if (t.includes("holiday")) return "holiday";
   return "holiday";
 }
-function normalizeItem(raw){
+
+function normalizeItem(raw) {
   const id = raw.id ?? raw.holiday_id ?? raw.hid;
-  const start_at = (raw.start_at || raw.start_date || raw.start || "").slice(0,10);
-  const end_at   = (raw.end_at || raw.end_date || raw.end || "").slice(0,10) || "";
-  const title    = raw.title ?? null;
-  const note     = raw.note ?? null;
-  const type     = inferType(raw);
+  const start_at = (raw.start_at || raw.start_date || raw.start || "").slice(0, 10);
+  const end_at = (raw.end_at || raw.end_date || raw.end || "").slice(0, 10) || "";
+  const title = raw.title ?? null;
+  const note = raw.note ?? null;
+  const type = inferType(raw);
   return { ...raw, id, start_at, end_at, title, note, type };
 }
 
-function iconForType(type){ return type === "cancel" ? "🚫" : "📌"; }
+function iconForType(type) { return type === "cancel" ? "🚫" : "📌"; }
 
-function labelTitle(it, title){
-  if (it.type === "cancel") {
-    return `🚫 ยกคลาส: ${title || "ยกคลาส"}`;
-  }
+function labelTitle(it, title) {
+  if (it.type === "cancel") return `🚫 ยกคลาส: ${title || "ยกคลาส"}`;
   return title ? `📌 วันหยุด: ${title}` : `📌 วันหยุด`;
 }
 
-function humanRange(start, end){
+function humanRange(start, end) {
   if (!end || end === start) return start;
   return `${start} → ${end}`;
 }
 
-function isDirty(){ return state.edits.size > 0 || state.deletes.size > 0; }
+function isDirty() { return state.edits.size > 0 || state.deletes.size > 0; }
 
-function updateFooter(){
+function updateFooter() {
   els.countLabel.textContent = `แก้ไข ${state.edits.size} รายการ • ลบ ${state.deletes.size} รายการ`;
   els.btnSave.disabled = !isDirty();
 }
 
 // --- render list ---
-function render(){
+function render() {
   els.list.innerHTML = "";
 
-  if (!state.items.length) els.empty.hidden = false;
-  else els.empty.hidden = true;
+  els.empty.hidden = state.items.length !== 0;
 
   for (const it of state.items) {
     const deleted = state.deletes.has(it.id);
     const pending = state.edits.get(it.id) || {};
 
     const start = ("start_at" in pending) ? pending.start_at : it.start_at;
-    const end   = ("end_at" in pending) ? pending.end_at : it.end_at;
+    const end = ("end_at" in pending) ? pending.end_at : it.end_at;
     const title = ("title" in pending) ? pending.title : it.title;
-    const note  = ("note" in pending) ? pending.note : it.note;
+    const note = ("note" in pending) ? pending.note : it.note;
 
     const card = document.createElement("div");
     card.className = "card" + (deleted ? " deleted" : "");
@@ -172,17 +171,23 @@ function render(){
 
     left.append(h, tags, n);
 
-    const right = document.createElement("div");
-    right.className = "cardBtns";
+    row.append(left);
+    card.append(row);
+
+    // ✅ actions icon ขวาล่าง
+    const actions = document.createElement("div");
+    actions.className = "cardActions";
 
     const btnEdit = document.createElement("button");
-    btnEdit.className = "btn btn--ghost";
-    btnEdit.textContent = "แก้ไข";
+    btnEdit.className = "iconBtn editBtn";
+    btnEdit.innerHTML = "✏️";
+    btnEdit.title = "แก้ไข";
     btnEdit.onclick = () => openModal(it.id);
 
     const btnDel = document.createElement("button");
-    btnDel.className = "btn btn--danger";
-    btnDel.textContent = deleted ? "Undo" : "ลบ";
+    btnDel.className = "iconBtn deleteBtn";
+    btnDel.innerHTML = deleted ? "↩️" : "🗑️";
+    btnDel.title = deleted ? "ยกเลิกลบ" : "ลบ";
     btnDel.onclick = () => {
       if (state.deletes.has(it.id)) state.deletes.delete(it.id);
       else state.deletes.add(it.id);
@@ -190,10 +195,9 @@ function render(){
       updateFooter();
     };
 
-    right.append(btnEdit, btnDel);
+    actions.append(btnEdit, btnDel);
+    card.append(actions);
 
-    row.append(left, right);
-    card.append(row);
     els.list.append(card);
   }
 
@@ -201,21 +205,19 @@ function render(){
 }
 
 /* =========================
-   ✅ MODAL (แก้หลัก)
-   - กัน modal โผล่เอง
-   - ปิดได้แน่นอน: ปุ่ม / คลิกพื้นหลัง / ESC
+   ✅ MODAL
    ========================= */
 
-function openModal(id){
+function openModal(id) {
   state.currentId = id;
   const it = state.items.find(x => x.id === id);
   if (!it) return;
 
   const pending = state.edits.get(id) || {};
   const start = ("start_at" in pending) ? pending.start_at : it.start_at;
-  const end   = ("end_at" in pending) ? pending.end_at : it.end_at;
+  const end = ("end_at" in pending) ? pending.end_at : it.end_at;
   const title = ("title" in pending) ? pending.title : (it.title ?? "");
-  const note  = ("note" in pending) ? pending.note : (it.note ?? "");
+  const note = ("note" in pending) ? pending.note : (it.note ?? "");
 
   els.modalTitle.textContent = `${iconForType(it.type)} แก้ไขรายการ`;
   els.modalMeta.textContent = ""; // production: ไม่โชว์ id/user
@@ -233,13 +235,13 @@ function openModal(id){
   els.overlay.style.display = "flex";
 }
 
-function closeModal(){
+function closeModal() {
   els.overlay.hidden = true;
   els.overlay.style.display = "none";
   state.currentId = null;
 }
 
-function applyModal(){
+function applyModal() {
   const id = state.currentId;
   const it = state.items.find(x => x.id === id);
   if (!it) return;
@@ -251,7 +253,7 @@ function applyModal(){
   if (end_at && end_at < start_at) return toast("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม");
 
   const titleRaw = (els.mTitle.value || "").trim();
-  const noteRaw  = (els.mNote.value || "").trim();
+  const noteRaw = (els.mNote.value || "").trim();
 
   // holiday: ว่าง = null
   // cancel: ว่าง = "" (ให้ Worker fallback ต่อ)
@@ -282,14 +284,14 @@ function applyModal(){
 }
 
 // --- actions ---
-function discardAll(){
+function discardAll() {
   state.edits.clear();
   state.deletes.clear();
   toast("ทิ้งการแก้ไขทั้งหมดแล้ว");
   render();
 }
 
-async function loadList(){
+async function loadList() {
   els.subtitle.textContent = "กำลังโหลดรายการ…";
 
   const from = state.range.from;
@@ -300,7 +302,7 @@ async function loadList(){
   const data = await apiFetch(url);
   const arr = Array.isArray(data) ? data : (data.items || data.holidays || []);
   state.items = arr.map(normalizeItem).filter(x => x.id != null);
-  state.items.sort((a,b) => (a.start_at || "").localeCompare(b.start_at || ""));
+  state.items.sort((a, b) => (a.start_at || "").localeCompare(b.start_at || ""));
 
   state.edits.clear();
   state.deletes.clear();
@@ -310,7 +312,7 @@ async function loadList(){
   render();
 }
 
-async function saveAll(){
+async function saveAll() {
   if (!isDirty()) return;
 
   els.btnSave.disabled = true;
@@ -331,7 +333,7 @@ async function saveAll(){
     // ส่งข้อความเข้าแชต (ถ้าเปิดจาก LINE client)
     try {
       if (liff.isInClient() && liff.sendMessages) {
-        await liff.sendMessages([{ type:"text", text:"บันทึกการแก้ไขวันหยุดแล้ว ✅" }]);
+        await liff.sendMessages([{ type: "text", text: "บันทึกการแก้ไขวันหยุดแล้ว ✅" }]);
       }
     } catch {}
 
@@ -349,19 +351,16 @@ async function saveAll(){
 }
 
 // --- bind UI ---
-function bindUI(){
+function bindUI() {
   els.btnDiscard.onclick = discardAll;
   els.btnSave.onclick = saveAll;
 
-  // ✅ ปิดด้วยปุ่ม
   els.btnCloseModal.onclick = closeModal;
 
-  // ✅ ปิดด้วยคลิกพื้นหลัง
   els.overlay.addEventListener("click", (e) => {
     if (e.target === els.overlay) closeModal();
   });
 
-  // ✅ ปิดด้วย ESC
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !els.overlay.hidden) closeModal();
   });
@@ -388,11 +387,11 @@ function bindUI(){
 }
 
 // --- LIFF init (login-first) ---
-async function initLiffLoginFirst(){
+async function initLiffLoginFirst() {
   els.subtitle.textContent = "กำลังเริ่มต้น…";
 
   await liff.init({
-    liffId: "2009146879-3eBGpF5j",
+    liffId: LIFF_ID,
     withLoginOnExternalBrowser: true
   });
 
@@ -402,7 +401,6 @@ async function initLiffLoginFirst(){
     return;
   }
 
-  // ต้องมี idToken (scope openid)
   getIdTokenOrThrow();
 
   const profile = await liff.getProfile();
@@ -412,22 +410,22 @@ async function initLiffLoginFirst(){
 }
 
 // --- main ---
-(async function main(){
-  // ✅ บังคับปิด modal ตั้งแต่เริ่ม (กันโผล่ค้าง)
+(async function main() {
+  // กัน modal โผล่ค้าง
   closeModal();
 
   // range: today-30 to today+90
   const now = new Date();
   const fromD = new Date(now); fromD.setDate(fromD.getDate() - 30);
-  const toD   = new Date(now); toD.setDate(toD.getDate() + 90);
+  const toD = new Date(now); toD.setDate(toD.getDate() + 90);
   state.range.from = ymd(fromD);
-  state.range.to   = ymd(toD);
+  state.range.to = ymd(toD);
 
   bindUI();
 
   try {
     await initLiffLoginFirst();
-    if (!state.userId) return; // redirect to login
+    if (!state.userId) return;
 
     await loadList();
   } catch (e) {
