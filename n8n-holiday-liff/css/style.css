@@ -1,520 +1,70 @@
 :root{
-  --bg:#fafafa;
-  --card:#fff;
-  --border:#e5e5e5;
-  --text:#111;
-  --muted:#666;
+  --bg:#f6f7fb;
+  --card: rgba(255,255,255,.92);
+  --border: rgba(17,24,39,.10);
+  --text:#111827;
+  --muted: rgba(17,24,39,.65);
   --danger:#b00020;
   --ok:#0b6b0b;
-  --btn:#111;
+
+  --btn:#111827;
   --btnText:#fff;
-  --radius:14px;
+
+  --radius:18px;
+  --radiusSm:14px;
+
+  --shadow: 0 18px 60px rgba(17,24,39,.10);
+  --shadowSoft: 0 10px 30px rgba(17,24,39,.08);
 }
 
 *{ box-sizing:border-box; }
+html,body{ height:100%; }
 body{
   margin:0;
   padding:16px;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif;
-  background:var(--bg);
-  color:var(--text);
+  color: var(--text);
+  background:
+    radial-gradient(1200px 500px at 50% -50px, rgba(17,24,39,.06), transparent 60%),
+    var(--bg);
 }
 
-.hidden{ display:none !important; }
-
+/* Loading */
 .loading{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  min-height:60vh;
-  color:#444;
+  max-width: 560px;
+  margin: 18px auto 0;
 }
 .loading__box{
-  max-width:560px;
-  width:100%;
-  background:var(--card);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  padding:16px;
-}
-.loading__title{ font-size:18px; font-weight:800; }
-.loading__subtitle{ margin-top:6px; color:var(--muted); }
-
-.card{
-  max-width:560px;
-  margin:0 auto;
-  background:var(--card);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  padding:16px;
-}
-.card__header{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
-.card__title{ margin:0; font-size:22px; }
-
-.pill{
-  display:inline-block;
-  padding:4px 10px;
-  border-radius:999px;
-  background:#f1f1f1;
-  font-size:12px;
-  color:#333;
-  white-space:nowrap;
-}
-
-.section{ margin-top:6px; }
-.field{ margin-top:12px; }
-label{ display:block; font-weight:750; }
-input, select, textarea{
-  width:100%;
-  padding:10px;
-  margin-top:6px;
-  border-radius:12px;
-  border:1px solid #ccc;
-  font-size:14px;
-  background:#fff;
-}
-.hint{
-  display:block;
-  margin-top:6px;
-  color:var(--muted);
-  line-height:1.35;
-  font-size:12px;
-}
-
-.row{ display:flex; gap:10px; }
-.row > div{ flex:1; }
-
-.btn{
-  width:100%;
-  margin-top:16px;
-  padding:12px;
-  border-radius:var(--radius);
-  border:0;
-  font-weight:850;
-  background:var(--btn);
-  color:var(--btnText);
-  cursor:pointer;
-}
-.btn:disabled{ opacity:.55; cursor:not-allowed; }
-
-.btn--ghost{
-  background:transparent;
-  color:var(--text);
-  border:1px solid var(--border);
-  margin-top:10px;
-}
-
-.msg{
-  margin-top:10px;
-  min-height:20px;
-  font-weight:650;
-}
-.msg--err{ color:var(--danger); }
-.msg--ok{ color:var(--ok); }
-
-.footer{ margin-top:8px; }
-
-/* =========================
-   ✅ LEVEL 2: subject blocks
-   ========================= */
-
-.subjects{
-  margin-top:10px;
-  border:1px solid var(--border);
-  border-radius:14px;
-  background:#fff;
-  overflow:hidden;
-}
-
-.subjects__loading{
-  padding:12px;
-  color:var(--muted);
-  font-weight:650;
-}
-
-.dayGroup{
-  border-top:1px solid var(--border);
-}
-.dayGroup:first-child{
-  border-top:0;
-}
-
-.dayHeader{
-  padding:10px 12px;
-  background:#f6f6f6;
-  font-weight:900;
-  font-size:13px;
-  color:#333;
-}
-
-.subjectItem{
-  width:100%;
-  border:0;
-  border-top:1px solid var(--border);
-  background:#fff;
-  padding:10px 12px;
-  text-align:left;
-  cursor:pointer;
-  display:flex;
-  gap:10px;
-  align-items:flex-start;
-}
-.subjectItem:first-of-type{
-  border-top:0;
-}
-
-.subjectItem:hover{
-  background:#fafafa;
-}
-
-.subjectItem.isActive{
-  background:#111;
-  color:#fff;
-}
-
-.subjectTime{
-  min-width:96px;
-  font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-weight:900;
-  font-size:12px;
-  opacity:.95;
-}
-
-.subjectMain{
-  flex:1;
-  min-width:0;
-}
-
-.subjectLine1{
-  font-weight:900;
-  font-size:13px;
-  line-height:1.2;
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-}
-
-.subjectCode{
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-variant-numeric: tabular-nums;
-}
-
-.subjectTypePill{
-  font-size:11px;
-  padding:2px 8px;
-  border-radius:999px;
-  border:1px solid #dcdcdc;
-  background:#fff;
-  color:#111;
-  font-weight:900;
-}
-
-.subjectItem.isActive .subjectTypePill{
-  border-color: rgba(255,255,255,.4);
-  background: rgba(255,255,255,.12);
-  color:#fff;
-}
-
-.subjectName{
-  font-size:13px;
-  color:#333;
-  margin-top:3px;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-
-.subjectItem.isActive .subjectName{
-  color:#fff;
-  opacity:.95;
-}
-
-.selected{
-  margin-top:10px;
-  padding:10px 12px;
-  border:1px dashed var(--border);
-  border-radius:12px;
-  background:#fcfcfc;
-  font-size:13px;
-  line-height:1.35;
-}
-
-.selected b{
-  font-weight:950;
-}
-
-/* ===== Fix Date Range Layout ===== */
-.row--date { display:flex; align-items:center; gap:12px; }
-.row--date .date-col { flex:1; }
-.row--date .date-sep { flex:0 0 auto; font-weight:600; opacity:0.6; padding:0 4px; user-select:none; }
-
-/* ===== Success overlay (ของเดิมคุณมี) ===== */
-.successOverlay{
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.5);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:9999;
-}
-.successOverlay.hidden{ display:none; }
-
-.successBox{
-  background:white;
-  padding:30px;
-  border-radius:20px;
-  text-align:center;
-  animation: popIn .3s ease;
-}
-.checkmark{
-  font-size:60px;
-  color:#00c851;
-  animation: bounce 0.6s ease;
-}
-.successText{
-  margin-top:10px;
-  font-weight:600;
-  font-size:18px;
-}
-@keyframes popIn { from { transform: scale(.8); opacity:0; } to { transform: scale(1); opacity:1; } }
-@keyframes bounce { 0% { transform: scale(0); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
-
-/* ===== Reminder modal overlays ===== */
-.modalOverlay{
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.5);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:10000;
-}
-.modalOverlay.hidden{ display:none; }
-
-.modalBox{
-  width: min(520px, calc(100vw - 32px));
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 16px;
-  animation: popIn .25s ease;
-}
-
-.modalTitle{
-  font-size:18px;
-  font-weight:900;
-}
-
-.modalSub{
-  margin-top:6px;
-  color: var(--muted);
-  font-size:13px;
-  line-height:1.35;
-}
-
-.modalActions{
-  display:flex;
-  gap:10px;
-  margin-top:14px;
-}
-
-/* ปุ่มซ้าย/ขวา: ปิดซ้าย / ตั้งขวา */
-.btn--half{
-  width: 50%;
-  margin-top: 0;
-}
-
-/* ===== NEW: Google Calendar-like reminder list ===== */
-
-.remList{
-  margin-top:12px;
-  display:grid;
-  gap:10px;
-}
-
-.remItem{
-  border:1px solid var(--border);
-  border-radius:14px;
-  padding:12px;
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
-  background:#fff;
-}
-
-.remLeft{
-  display:flex;
-  align-items:flex-start;
-  gap:10px;
-  min-width:0;
-}
-
-.remItem input[type="checkbox"]{
-  width:auto;
-  margin:0;
-  transform: scale(1.15);
-}
-
-.remText{
-  min-width:0;
-}
-
-.remLabel{
-  font-weight:900;
-  font-size:14px;
-  line-height:1.25;
-}
-
-.remHint{
-  margin-top:3px;
-  font-size:12px;
-  color:var(--muted);
-  line-height:1.35;
-}
-
-.customBox{
-  margin-top:12px;
-  padding:12px;
-  border:1px dashed var(--border);
-  border-radius:14px;
-  background:#fbfbfb;
-}
-
-.row--custom{
-  display:grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap:12px;
-  align-items:start;
-}
-
-.row--custom .date-sep{
-  align-self:center;
-  font-weight:600;
-  opacity:0.6;
-  padding:0 4px;
-  user-select:none;
-  margin-top: 18px; /* ให้ไอคอน/ตัวคั่นอยู่ระดับเดียวกับช่องกรอก */
-}
-
-.miniLabel{
-  display:flex;
-  align-items:center;
-  min-height: 20px;
-  font-size:12px;
-  font-weight:900;
-  margin-bottom:4px;
-  color:#333;
-  opacity:.9;
-}
-/* =========================
-   🔔 Inline Reminder Controls
-   ========================= */
-
-.segmented{
-  margin-top:8px;
-  display:flex;
-  gap:10px;
-}
-
-.segBtn{
-  width:50%;
-  padding:10px 12px;
-  border-radius:14px;
-  border:1px solid var(--border);
-  background:#fff;
-  cursor:pointer;
-  font-weight:900;
-}
-
-.segBtn.isActive{
-  background:#111;
-  color:#fff;
-  border-color:#111;
-}
-
-.remPicker{
-  margin-top:12px;
-  padding:12px;
-  border:1px dashed var(--border);
-  border-radius:14px;
-  background:#fbfbfb;
-}
-
-/* =========================
-   🕒 Time Inputs (Hour/Minute)
-   ========================= */
-
-.timeRow{
-  display:flex;
-  align-items:center;
-  gap:8px;
-}
-
-.timeRow input{
-  width:78px;
-  height: 42px;
-  padding:10px;
-  text-align:center;
-  font-weight:900;
-}
-
-/* hide number spinners (optional, nicer UI) */
-.timeRow input::-webkit-outer-spin-button,
-.timeRow input::-webkit-inner-spin-button{
-  -webkit-appearance: none;
-  margin: 0;
-}
-.timeRow input[type=number]{
-  -moz-appearance: textfield;
-}
-
-.timeSep{
-  font-weight:900;
-  opacity:.7;
-}
-
-/* =========================
-   ✨ Minimal Luxe UI overrides
-   - Calm, airy, premium feel
-   - Keeps existing structure/classes
-========================= */
-
-:root{
-  --bg: #f6f7fb;
-  --card: rgba(255,255,255,.92);
-  --text: #111827;
-  --muted: rgba(17,24,39,.65);
-  --border: rgba(17,24,39,.10);
-
-  --shadow: 0 18px 60px rgba(17,24,39,.10);
-  --shadow-soft: 0 10px 30px rgba(17,24,39,.08);
-
-  --btn: #111827;
-  --btnText: #ffffff;
-  --btnGhost: rgba(17,24,39,.06);
-  --btnGhostHover: rgba(17,24,39,.10);
-
-  --radius: 18px;
-  --radius-sm: 14px;
-}
-
-/* Page */
-body{
-  background: radial-gradient(1200px 500px at 50% -50px, rgba(17,24,39,.06), transparent 60%),
-              var(--bg);
-  color: var(--text);
-}
-
-.card{
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  padding: 18px;
   box-shadow: var(--shadow);
   backdrop-filter: blur(10px);
 }
+.loading__title{
+  font-weight: 900;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+.loading__subtitle{
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Card */
+.card{
+  max-width: 560px;
+  margin: 18px auto 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+}
+.hidden{ display:none !important; }
 
 .card__header{
   display:flex;
@@ -523,12 +73,11 @@ body{
   gap:12px;
   margin-bottom: 10px;
 }
-
 .card__title{
+  margin:0;
   font-size: 22px;
   letter-spacing: -0.02em;
 }
-
 .pill{
   background: rgba(17,24,39,.06);
   border: 1px solid rgba(17,24,39,.08);
@@ -540,86 +89,180 @@ body{
 }
 
 /* Fields */
-.field label,
+.field{ margin-top: 14px; }
 label{
-  color: rgba(17,24,39,.78);
-  font-weight: 700;
+  display:block;
+  font-weight: 800;
   letter-spacing: -0.01em;
+  color: rgba(17,24,39,.78);
+  margin-bottom: 6px;
 }
-
 input, textarea, select{
+  width:100%;
   background: rgba(255,255,255,.95);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radiusSm);
   padding: 11px 12px;
+  font-size: 14px;
   box-shadow: 0 1px 0 rgba(17,24,39,.03);
-  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
-
+textarea{ resize: vertical; }
 input:focus, textarea:focus, select:focus{
-  outline: none;
+  outline:none;
   border-color: rgba(17,24,39,.22);
   box-shadow: 0 0 0 4px rgba(17,24,39,.08);
 }
-
 .hint, small.hint{
+  display:block;
+  margin-top: 6px;
   color: var(--muted);
+  font-size: 12px;
+}
+
+/* Rows */
+.row{ display:flex; gap:10px; }
+.row--date{ align-items: center; }
+.date-col{ flex:1; }
+.date-sep{
+  font-weight: 900;
+  color: rgba(17,24,39,.55);
+  user-select:none;
 }
 
 /* Segmented */
 .segmented{
+  margin-top: 8px;
+  display:flex;
+  gap:10px;
   background: rgba(17,24,39,.05);
   padding: 6px;
   border-radius: 16px;
   border: 1px solid rgba(17,24,39,.06);
 }
-
 .segBtn{
+  flex:1;
   border-radius: 14px;
   border: 1px solid transparent;
   background: transparent;
   color: rgba(17,24,39,.78);
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: -0.01em;
   padding: 9px 12px;
+  cursor:pointer;
 }
-
 .segBtn.isActive{
   background: var(--btn);
   color: var(--btnText);
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--shadowSoft);
 }
 
-/* Reminders inline items */
+/* Buttons */
+.btn{
+  width:100%;
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(17,24,39,.10);
+  background: var(--btn);
+  color: var(--btnText);
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  cursor:pointer;
+  transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease, background .12s ease;
+}
+.btn:active{ transform: translateY(1px); }
+.btn[disabled]{ opacity:.45; cursor:not-allowed; }
+
+.btn--primary{
+  background: var(--btn);
+  color: var(--btnText);
+  box-shadow: var(--shadowSoft);
+}
+.btn--ghost{
+  background: rgba(17,24,39,.06);
+  color: rgba(17,24,39,.85);
+}
+.btn--ghost:hover{ background: rgba(17,24,39,.10); }
+
+/* Reminders multi */
+.remPicker{ margin-top: 10px; }
+.remListInline{ display:grid; gap:10px; margin-top: 10px; }
 .remInlineItem{
   border: 1px solid rgba(17,24,39,.10);
   background: rgba(255,255,255,.85);
   border-radius: 16px;
-  box-shadow: 0 1px 0 rgba(17,24,39,.03);
+  padding: 12px;
 }
-
+.remInlineTop{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px;
+}
+.remInlineTitle{
+  font-weight: 900;
+  font-size: 13px;
+  opacity: .9;
+}
 .remRemoveBtn{
+  width:auto;
+  margin:0;
+  padding:8px 10px;
   border-radius: 12px;
   border: 1px solid rgba(17,24,39,.10);
   background: rgba(17,24,39,.04);
+  cursor:pointer;
+  font-weight: 900;
+}
+.remRemoveBtn:hover{ background: rgba(17,24,39,.08); }
+.remInlineGrid{
+  display:grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 12px;
+  align-items:start;
+}
+.remInlineGrid .date-sep{
+  align-self:center;
+  margin-top: 18px;
+}
+.remInlineActions{ margin-top: 10px; }
+.remAddBtn{ width:auto; }
+
+/* Subjects */
+.subjects{
+  margin-top: 10px;
+  border: 1px solid rgba(17,24,39,.10);
+  border-radius: 16px;
+  padding: 10px;
+  background: rgba(255,255,255,.75);
+}
+.subjects__loading{
+  color: var(--muted);
+  font-size: 12px;
+}
+.selected{
+  margin-top: 10px;
+  border: 1px solid rgba(17,24,39,.10);
+  border-radius: 16px;
+  padding: 10px;
+  background: rgba(17,24,39,.04);
 }
 
-.remRemoveBtn:hover{
-  background: rgba(17,24,39,.08);
+/* Message */
+.msg{
+  margin-top: 10px;
+  font-size: 14px;
+  color: rgba(17,24,39,.80);
 }
 
-/* =========================
-   ✅ Action buttons (Save / Reset)
-   - Positioned bottom-right inside the card
-   - Sticky so it stays easy to tap
-========================= */
+/* Action row: small, together, bottom-right (mobile centers) */
 .formActions{
   display:flex;
   align-items:center;
   gap:10px;
 }
-
-/* sticky variant */
 .formActions--sticky{
   position: sticky;
   bottom: 10px;
@@ -629,58 +272,19 @@ input:focus, textarea:focus, select:focus{
   background: rgba(255,255,255,.72);
   border: 1px solid rgba(17,24,39,.08);
   backdrop-filter: blur(12px);
-  box-shadow: var(--shadow-soft);
-
-  justify-content: flex-end; /* bottom-right */
+  box-shadow: var(--shadowSoft);
+  justify-content: flex-end;
 }
-
-/* make sure only these buttons are compact */
 .formActions--sticky .btn{
   width:auto;
   margin-top:0;
   padding: 10px 14px;
   border-radius: 14px;
   font-size: 14px;
-  font-weight: 900;
-  letter-spacing: -0.01em;
   line-height: 1;
-  transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease;
 }
+.btn--sm{ min-width: 104px; }
 
-.formActions--sticky .btn:active{
-  transform: translateY(1px);
-}
-
-.formActions--sticky #resetBtn.btn--ghost{
-  background: var(--btnGhost);
-  border: 1px solid rgba(17,24,39,.08);
-}
-
-.formActions--sticky #resetBtn.btn--ghost:hover{
-  background: var(--btnGhostHover);
-}
-
-.formActions--sticky #submitBtn{
-  background: var(--btn);
-  color: var(--btnText);
-  border: 1px solid rgba(17,24,39,.10);
-  box-shadow: var(--shadow-soft);
-}
-
-.formActions--sticky #submitBtn[disabled]{
-  opacity: .45;
-  box-shadow: none;
-}
-
-/* On very small screens, center the actions for easier tap */
 @media (max-width: 420px){
-  .formActions--sticky{
-    justify-content: center;
-  }
-}
-
-/* Message */
-.msg{
-  margin-top: 10px;
-  color: rgba(17,24,39,.78);
+  .formActions--sticky{ justify-content:center; }
 }
