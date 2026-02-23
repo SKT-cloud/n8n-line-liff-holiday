@@ -31,7 +31,9 @@
     <section class="panel" id="settingsPanel" hidden>
       <div class="panel__head">
         <h2 class="h2">ตั้งค่าการเชื่อมต่อ</h2>
-        <p class="help">ใส่ API Base ของ Worker (และ API Key ถ้ามี Bearer)</p>
+        <p class="help">
+          ใส่ API Base ของ Worker เท่านั้น (ระบบจะส่ง LIFF idToken ให้อัตโนมัติ)
+        </p>
       </div>
 
       <div class="grid2">
@@ -42,9 +44,11 @@
         </div>
 
         <div>
-          <label class="label">API Key (ถ้า Worker ใช้ Bearer)</label>
-          <input class="input" id="apiKey" type="text" placeholder="กรอกครั้งเดียว (เก็บในเครื่อง)" />
-          <div class="hint">ถ้ายังไม่อยากใช้ ปล่อยว่างได้</div>
+          <label class="label">หมายเหตุ</label>
+          <div class="hint">
+            ✅ หน้าเว็บนี้จะบังคับล็อกอิน LINE ก่อน<br/>
+            ✅ Worker จะอนุญาตให้แก้/ลบได้เฉพาะข้อมูลของ userId ตัวเองเท่านั้น
+          </div>
         </div>
       </div>
 
