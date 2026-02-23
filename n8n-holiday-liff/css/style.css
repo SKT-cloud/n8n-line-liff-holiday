@@ -86,12 +86,11 @@ input, select, textarea{
 
 .btn{
   width:100%;
-  margin-top:14px;
-  padding:10px 14px;
+  margin-top:16px;
+  padding:12px;
   border-radius:var(--radius);
   border:0;
   font-weight:850;
-  font-size:14px;
   background:var(--btn);
   color:var(--btnText);
   cursor:pointer;
@@ -100,7 +99,6 @@ input, select, textarea{
 
 .btn--ghost{
   background:transparent;
-  padding:9px 12px;
   color:var(--text);
   border:1px solid var(--border);
   margin-top:10px;
@@ -419,14 +417,11 @@ input, select, textarea{
   margin-top:8px;
   display:flex;
   gap:10px;
-  background:rgba(0,0,0,.04);
-  padding:6px;
-  border-radius:16px;
 }
 
 .segBtn{
   width:50%;
-  padding:9px 12px;
+  padding:10px 12px;
   border-radius:14px;
   border:1px solid var(--border);
   background:#fff;
@@ -473,185 +468,219 @@ input, select, textarea{
   margin: 0;
 }
 .timeRow input[type=number]{
-  appearance: textfield;       /* มาตรฐาน */
-  -moz-appearance: textfield;  /* Firefox */
-  -webkit-appearance: none;    /* Chrome/Safari */
+  -moz-appearance: textfield;
 }
 
 .timeSep{
   font-weight:900;
   opacity:.7;
 }
+
 /* =========================
-   🔔 Multi reminders (Add page)
-   ========================= */
-.remListInline{
-  margin-top:10px;
-  display:grid;
-  gap:10px;
+   ✨ Minimal Luxe UI overrides
+   - Calm, airy, premium feel
+   - Keeps existing structure/classes
+========================= */
+
+:root{
+  --bg: #f6f7fb;
+  --card: rgba(255,255,255,.92);
+  --text: #111827;
+  --muted: rgba(17,24,39,.65);
+  --border: rgba(17,24,39,.10);
+
+  --shadow: 0 18px 60px rgba(17,24,39,.10);
+  --shadow-soft: 0 10px 30px rgba(17,24,39,.08);
+
+  --btn: #111827;
+  --btnText: #ffffff;
+  --btnGhost: rgba(17,24,39,.06);
+  --btnGhostHover: rgba(17,24,39,.10);
+
+  --radius: 18px;
+  --radius-sm: 14px;
 }
-.remInlineItem{
-  border:1px solid var(--border);
-  border-radius:14px;
-  padding:12px;
-  background:#fff;
+
+/* Page */
+body{
+  background: radial-gradient(1200px 500px at 50% -50px, rgba(17,24,39,.06), transparent 60%),
+              var(--bg);
+  color: var(--text);
 }
-.remInlineTop{
+
+.card{
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+}
+
+.card__header{
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   justify-content:space-between;
-  gap:10px;
-  margin-bottom:10px;
-}
-.remInlineTitle{
-  font-weight:900;
-  font-size:13px;
-  opacity:.9;
-}
-.remRemoveBtn{
-  width:auto;
-  margin:0;
-  padding:8px 10px;
-  border-radius:12px;
-  border:1px solid var(--border);
-  background:transparent;
-  cursor:pointer;
-  font-weight:900;
-}
-.remRemoveBtn:hover{ background:#fafafa; }
-.remInlineGrid{
-  display:grid;
-  grid-template-columns: 1fr auto 1fr;
   gap:12px;
-  align-items:start;
-}
-.remInlineGrid .date-sep{
-  align-self:center;
-  font-weight:900;
-  opacity:.7;
-  padding:0 4px;
-  user-select:none;
-  margin-top: 18px;
-}
-.remInlineActions{ margin-top:10px; }
-.remAddBtn{ margin-top:0; }
-
-/* =========================
-   Minimal form actions
-========================= */
-
-.formActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 18px;
+  margin-bottom: 10px;
 }
 
-/* ทำให้ปุ่มไม่ full width */
-/* ปุ่มขนาดเล็ก */
-.btn--sm {
-  padding: 6px 16px;
-  font-size: 14px;
-  border-radius: 8px;
-  min-width: 88px;
+.card__title{
+  font-size: 22px;
+  letter-spacing: -0.02em;
 }
 
-/* primary แบบ minimal */
-.btn--primary {
-  background: #111;
-  color: #fff;
-  border: 1px solid #111;
+.pill{
+  background: rgba(17,24,39,.06);
+  border: 1px solid rgba(17,24,39,.08);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: rgba(17,24,39,.75);
+  white-space: nowrap;
 }
 
-.btn--primary:hover {
-  opacity: 0.9;
+/* Fields */
+.field label,
+label{
+  color: rgba(17,24,39,.78);
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
-/* ghost เรียบ ๆ */
-.btn--ghost {
+input, textarea, select{
+  background: rgba(255,255,255,.95);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 11px 12px;
+  box-shadow: 0 1px 0 rgba(17,24,39,.03);
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+input:focus, textarea:focus, select:focus{
+  outline: none;
+  border-color: rgba(17,24,39,.22);
+  box-shadow: 0 0 0 4px rgba(17,24,39,.08);
+}
+
+.hint, small.hint{
+  color: var(--muted);
+}
+
+/* Segmented */
+.segmented{
+  background: rgba(17,24,39,.05);
+  padding: 6px;
+  border-radius: 16px;
+  border: 1px solid rgba(17,24,39,.06);
+}
+
+.segBtn{
+  border-radius: 14px;
+  border: 1px solid transparent;
   background: transparent;
-  border: 1px solid #ddd;
-  color: #444;
+  color: rgba(17,24,39,.78);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  padding: 9px 12px;
 }
 
-.btn--ghost:hover {
-  background: #f5f5f5;
+.segBtn.isActive{
+  background: var(--btn);
+  color: var(--btnText);
+  box-shadow: var(--shadow-soft);
+}
+
+/* Reminders inline items */
+.remInlineItem{
+  border: 1px solid rgba(17,24,39,.10);
+  background: rgba(255,255,255,.85);
+  border-radius: 16px;
+  box-shadow: 0 1px 0 rgba(17,24,39,.03);
+}
+
+.remRemoveBtn{
+  border-radius: 12px;
+  border: 1px solid rgba(17,24,39,.10);
+  background: rgba(17,24,39,.04);
+}
+
+.remRemoveBtn:hover{
+  background: rgba(17,24,39,.08);
 }
 
 /* =========================
-   Minimal: Save / Reset actions (bottom)
-   - Reset left, Save right
-   - Small buttons, one row
+   ✅ Action buttons (Save / Reset)
+   - Positioned bottom-right inside the card
+   - Sticky so it stays easy to tap
 ========================= */
 .formActions{
   display:flex;
   align-items:center;
-  justify-content:space-between;
   gap:10px;
-  margin-top:14px;
 }
 
-/* Override only inside the action row */
-.formActions .btn{
+/* sticky variant */
+.formActions--sticky{
+  position: sticky;
+  bottom: 10px;
+  margin-top: 18px;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(255,255,255,.72);
+  border: 1px solid rgba(17,24,39,.08);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-soft);
+
+  justify-content: flex-end; /* bottom-right */
+}
+
+/* make sure only these buttons are compact */
+.formActions--sticky .btn{
   width:auto;
   margin-top:0;
-  padding:8px 14px;
-  border-radius:12px;
-  font-size:14px;
-  line-height:1;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease;
 }
 
-/* Small size (optional hook) */
-.btn--sm{ min-width: 96px; }
+.formActions--sticky .btn:active{
+  transform: translateY(1px);
+}
 
-/* Keep save button dark even if .btn changes elsewhere */
-.formActions #submitBtn.btn{
+.formActions--sticky #resetBtn.btn--ghost{
+  background: var(--btnGhost);
+  border: 1px solid rgba(17,24,39,.08);
+}
+
+.formActions--sticky #resetBtn.btn--ghost:hover{
+  background: var(--btnGhostHover);
+}
+
+.formActions--sticky #submitBtn{
   background: var(--btn);
   color: var(--btnText);
+  border: 1px solid rgba(17,24,39,.10);
+  box-shadow: var(--shadow-soft);
 }
 
-/* Ghost reset stays light */
-.formActions #resetBtn.btn--ghost{
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text);
+.formActions--sticky #submitBtn[disabled]{
+  opacity: .45;
+  box-shadow: none;
 }
 
-/* =========================
-   Minimal: Save / Reset actions (bottom)
-   - Reset left, Save right
-   - Small buttons, one row
-   ✅ scoped: affects only buttons inside .formActions
-========================= */
-.formActions{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  margin-top:14px;
+/* On very small screens, center the actions for easier tap */
+@media (max-width: 420px){
+  .formActions--sticky{
+    justify-content: center;
+  }
 }
 
-.formActions .btn{
-  width:auto;       /* override only here */
-  margin-top:0;
-  padding:8px 14px;
-  border-radius:12px;
-  font-size:14px;
-  line-height:1;
-}
-
-/* Optional min width hook */
-.btn--sm{ min-width: 96px; }
-
-/* Save button keeps dark style */
-.formActions #submitBtn.btn{
-  background: var(--btn);
-  color: var(--btnText);
-}
-
-/* Reset stays ghost */
-.formActions #resetBtn.btn--ghost{
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text);
+/* Message */
+.msg{
+  margin-top: 10px;
+  color: rgba(17,24,39,.78);
 }

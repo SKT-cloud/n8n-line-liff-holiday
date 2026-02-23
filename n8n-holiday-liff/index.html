@@ -3,88 +3,108 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>เพิ่มวันหยุด</title>
+  <title>แก้ไข / ลบวันหยุด</title>
 
-  <link rel="stylesheet" href="./css/style.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+  <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+  <link rel="stylesheet" href="./style.css" />
 </head>
 
 <body>
-  <div id="loading" class="loading">
-    <div class="loading__box">
-      <div class="loading__title">กำลังเตรียมฟอร์ม…</div>
-      <div class="loading__subtitle">กำลังตรวจสอบการเข้าสู่ระบบ LINE 🔐</div>
-    </div>
-  </div>
+  <header class="topbar">
+    <div class="container topbar__inner">
+      <div class="topbar__left">
+        <h1 class="h1">แก้ไข / ลบวันหยุด</h1>
+        <p class="sub" id="subtitle">กำลังโหลดข้อมูล…</p>
+      </div>
 
-  <div id="app" class="card hidden">
-    <div class="card__header">
-      <h1 class="card__title">เพิ่มวันหยุด</h1>
-      <div id="who" class="pill"></div>
+      <div class="topbar__right">
+        <!-- Production: ไม่ต้องมีปุ่มตั้งค่า/โหลดใหม่ -->
+      </div>
     </div>
+  </header>
 
-    <div class="field">
-      <label for="title">หัวข้อ (ไม่จำเป็น)</label>
-      <input id="title" type="text" placeholder="เช่น ไปอบรม / ป่วย" autocomplete="off" />
+  <main class="container">
+    <!-- List -->
+    <section class="list" id="list"></section>
+
+    <!-- Empty -->
+    <section class="empty" id="empty" hidden>
+      <h2 class="h2">ยังไม่มีรายการในช่วงนี้</h2>
+      <p class="help">ถ้ายังไม่เคยเพิ่มวันหยุด/ยกคลาส ลองไปเพิ่มก่อนน้า 😊</p>
+    </section>
+  </main>
+
+  <!-- Footer actions -->
+  <footer class="footerBar">
+    <div class="container footerBar__inner">
+      <div class="muted" id="countLabel">—</div>
+      <div class="footerBar__actions">
+        <button class="btn btn--ghost" id="btnDiscard" type="button">ทิ้งการแก้ไข</button>
+        <button class="btn btn--primary" id="btnSave" type="button" disabled>บันทึกทั้งหมด</button>
+      </div>
     </div>
+  </footer>
 
-    <div class="field">
-      <label for="note">หมายเหตุ (ไม่จำเป็น)</label>
-      <textarea id="note" rows="2" placeholder="เช่น สถานที่ / เหตุผล / รายละเอียดเพิ่มเติม"></textarea>
-    </div>
+  <!-- Toast -->
+  <div class="toast" id="toast" aria-live="polite"></div>
 
-    <div class="field">
-      <label for="mode">ประเภท</label>
-      <select id="mode">
-        <option value="all_day">หยุดทั้งวัน</option>
-        <option value="cancel_subject">ยกคลาส (เลือกวิชา)</option>
-      </select>
-    </div>
+  <!-- Modal -->
+  <div class="overlay" id="overlay" hidden style="display:none;">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="แก้ไขรายการ">
+      <div class="modal__head">
+        <div>
+          <h3 class="h3" id="modalTitle">แก้ไขรายการ</h3>
+          <p class="help" id="modalMeta"></p>
+        </div>
+        <button class="btn btn--ghost" id="btnCloseModal" type="button">ปิด</button>
+      </div>
 
-    <section id="allDayBox" class="section">
-      <div class="field">
-        <label>ช่วงวันที่หยุด</label>
-        <div class="row row--date">
-          <div class="date-col">
-            <input id="startDate" type="text" readonly placeholder="กรุณาเลือกวันที่เริ่ม" />
-          </div>
-          <div class="date-sep">–</div>
-          <div class="date-col">
-            <input id="endDate" type="text" readonly placeholder="หากหยุดวันเดียว สามารถเว้นไว้ได้" />
+      <div class="grid2 mt12">
+        <div>
+          <label class="label">วันที่เริ่ม</label>
+          <input class="input" type="date" id="mStart" />
+        </div>
+        <div>
+          <label class="label">วันที่สิ้นสุด (ไม่ใส่ = วันเดียว)</label>
+          <input class="input" type="date" id="mEnd" />
+        </div>
+      </div>
+
+      <div class="mt12">
+        <label class="label">หัวข้อ (ปล่อยว่างได้)</label>
+        <input class="input" type="text" id="mTitle" placeholder="เช่น สอบ / งานพิเศษ / ไปต่างจังหวัด" />
+      </div>
+
+      <div class="mt12">
+        <label class="label">หมายเหตุ (optional)</label>
+        <textarea class="textarea" id="mNote" placeholder="รายละเอียดเพิ่มเติม…"></textarea>
+      
+      <div class="mt12">
+        <label class="label">แจ้งเตือน (Reminders)</label>
+        <p class="help">ตั้งเวลาแจ้งเตือนหลายอันได้ • ถ้าไม่ใส่ = ไม่แจ้งเตือน</p>
+
+        <div class="reminders" id="mRemindersWrap">
+          <div class="reminders__list" id="mRemindersList"></div>
+
+          <div class="reminders__actions">
+            <button class="btn btn--ghost" id="btnAddReminder" type="button">+ เพิ่มเวลาแจ้งเตือน</button>
+            <button class="btn btn--ghost" id="btnClearReminders" type="button">ล้างแจ้งเตือน</button>
           </div>
         </div>
       </div>
-    </section>
 
-    <section id="cancelBox" class="section hidden"></section>
+</div>
 
-    <section id="reminderInline" class="section" style="margin-top:14px;">
-      <label>แจ้งเตือน</label>
-      <div class="segmented">
-        <button id="remNoneBtn" type="button" class="segBtn isActive">ไม่ตั้งแจ้งเตือน</button>
-        <button id="remSetBtn" type="button" class="segBtn">ตั้งแจ้งเตือน ⏰</button>
+      <div class="modal__actions mt12">
+        <button class="btn btn--danger" id="btnDeleteOne" type="button">ลบรายการนี้</button>
+        <button class="btn btn--ghost" id="btnUndoDelete" type="button" hidden>Undo ลบ</button>
+        <button class="btn btn--primary" id="btnApply" type="button">บันทึกการแก้ไขรายการนี้</button>
       </div>
-      <div id="remPicker" class="remPicker hidden">
-  <div id="remList" class="remListInline" aria-label="รายการแจ้งเตือน"></div>
-
-  <div class="remInlineActions">
-    <button id="remAddBtn" type="button" class="btn btn--ghost remAddBtn">+ เพิ่มเวลาแจ้งเตือน</button>
+    </div>
   </div>
 
-  <small class="hint">ห้ามเลือกย้อนหลัง • ใส่ได้หลายเวลา ✅</small>
-</div>
-</section>
-
-<div class="formActions">
-  <button id="resetBtn" class="btn btn--ghost btn--sm" type="button">ล้างฟอร์ม</button>
-  <button id="submitBtn" class="btn btn--sm" disabled>บันทึก</button>
-</div>
-
-<div id="msg" class="msg"></div>
-</div>
-
-  <script type="module" src="./js/main.js"></script>
+  <script src="./script.js"></script>
 </body>
 </html>
