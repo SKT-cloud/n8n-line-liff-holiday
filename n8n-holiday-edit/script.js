@@ -32,6 +32,10 @@ const els = {
   btnApply: document.getElementById("btnApply"),
   btnDeleteOne: document.getElementById("btnDeleteOne"),
   btnUndoDelete: document.getElementById("btnUndoDelete"),
+
+  mRemindersList: document.getElementById("mRemindersList"),
+  btnAddReminder: document.getElementById("btnAddReminder"),
+  btnClearReminders: document.getElementById("btnClearReminders"),
 };
 
 const state = {
@@ -41,6 +45,9 @@ const state = {
   deletes: new Set(),  // ids marked delete
   currentId: null,
   range: { from: null, to: null },
+  reminderEdits: new Map(),      // holidayId -> array of remind_at ISO strings
+  reminderOriginal: new Map(),   // holidayId -> original array
+  modalReminders: [],            // temp for modal editor
 };
 
 function toast(msg, ms = 1600) {
@@ -57,6 +64,18 @@ function getIdTokenOrThrow() {
   const token = liff.getIDToken?.();
   if (!token) throw new Error("ไม่พบ idToken (ตรวจว่า LIFF เปิด scope openid แล้ว)");
   return token;
+}
+
+function isTokenExpiredMessage(msg) {
+  if (!msg) return false;
+  const s = String(msg).toLowerCase();
+  return s.includes("idtoken expired") || s.includes("expired") || s.includes("invalid id_token") || s.includes("invalid token");
+}
+
+async function relogin() {
+  toast("เซสชันหมดอายุ กำลังพาไปล็อกอินใหม่… 🔐", 2000);
+  try { liff.logout(); } catch {}
+  try { liff.login({ redirectUri: window.location.href }); } catch {}
 }
 
 async function apiFetch(path, { method = "GET", body = null } = {}) {
@@ -77,9 +96,16 @@ async function apiFetch(path, { method = "GET", body = null } = {}) {
   catch { data = { raw: text }; }
 
   if (!res.ok) {
-    const msg = data?.error || data?.message || `HTTP ${res.status}`;
+  const msg = data?.error || data?.message || `HTTP ${res.status}`;
+
+  // ✅ idToken หมดอายุ/ไม่ผ่าน verify → ล็อกอินใหม่อัตโนมัติ
+  if (res.status === 401 || isTokenExpiredMessage(msg)) {
+    await relogin();
     throw new Error(msg);
   }
+
+  throw new Error(msg);
+}
   return data;
 }
 
@@ -113,10 +139,94 @@ function humanRange(start, end) {
   return `${start} → ${end}`;
 }
 
-function isDirty() { return state.edits.size > 0 || state.deletes.size > 0; }
+
+
+/* =========================
+   ✅ REMINDERS (edit in modal)
+   ========================= */
+
+// Convert ISO+07:00 -> value for <input type="datetime-local"> (YYYY-MM-DDTHH:mm)
+function isoToLocalInput(iso) {
+  if (!iso || typeof iso !== "string") return "";
+  // 2026-02-24T09:00:00+07:00 -> 2026-02-24T09:00
+  return iso.slice(0, 16);
+}
+
+// Convert <input type="datetime-local"> -> ISO with +07:00 (seconds forced :00)
+function localInputToIsoBkk(v) {
+  if (!v) return null;
+  // Expect: YYYY-MM-DDTHH:mm
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v)) return null;
+  return `${v}:00+07:00`;
+}
+
+async function loadRemindersForHoliday(holidayId) {
+  const data = await apiFetch(`/liff/holidays/reminders/list?holiday_id=${encodeURIComponent(holidayId)}`);
+  const arr = data?.items || [];
+  // keep only pending (allow editing). Sent/failed shown but locked (optional) — for now ignore non-pending.
+  const pending = arr.filter(x => (x.status || "pending") === "pending").map(x => x.remind_at).filter(Boolean);
+  return pending;
+}
+
+function renderRemindersEditor() {
+  const wrap = els.mRemindersList;
+  if (!wrap) return;
+  wrap.innerHTML = "";
+
+  if (!state.modalReminders || state.modalReminders.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "remEmpty";
+    empty.textContent = "ยังไม่มีการตั้งแจ้งเตือน";
+    wrap.append(empty);
+    return;
+  }
+
+  state.modalReminders.forEach((iso, idx) => {
+    const row = document.createElement("div");
+    row.className = "remRow";
+
+    const inp = document.createElement("input");
+    inp.type = "datetime-local";
+    inp.className = "input remInput";
+    inp.value = isoToLocalInput(iso);
+    inp.onchange = () => {
+      const nextIso = localInputToIsoBkk(inp.value);
+      if (!nextIso) {
+        toast("รูปแบบเวลาไม่ถูกต้อง");
+        inp.value = isoToLocalInput(state.modalReminders[idx]);
+        return;
+      }
+      state.modalReminders[idx] = nextIso;
+    };
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "iconBtn deleteBtn";
+    btn.title = "ลบเวลาแจ้งเตือนนี้";
+    btn.innerHTML = "🗑️";
+    btn.onclick = () => {
+      state.modalReminders.splice(idx, 1);
+      renderRemindersEditor();
+    };
+
+    row.append(inp, btn);
+    wrap.append(row);
+  });
+}
+
+// Compare reminders arrays ignoring order
+function sameReminderSet(a, b) {
+  const aa = (a || []).filter(Boolean).slice().sort();
+  const bb = (b || []).filter(Boolean).slice().sort();
+  if (aa.length !== bb.length) return false;
+  for (let i = 0; i < aa.length; i++) if (aa[i] !== bb[i]) return false;
+  return true;
+}
+
+function isDirty() { return state.edits.size > 0 || state.deletes.size > 0 || state.reminderEdits.size > 0; }
 
 function updateFooter() {
-  els.countLabel.textContent = `แก้ไข ${state.edits.size} รายการ • ลบ ${state.deletes.size} รายการ`;
+  els.countLabel.textContent = `แก้ไข ${state.edits.size} • ลบ ${state.deletes.size} • แจ้งเตือน ${state.reminderEdits.size}`;
   els.btnSave.disabled = !isDirty();
 }
 
@@ -208,7 +318,8 @@ function render() {
    ✅ MODAL
    ========================= */
 
-function openModal(id) {
+
+async function openModal(id) {
   state.currentId = id;
   const it = state.items.find(x => x.id === id);
   if (!it) return;
@@ -231,9 +342,26 @@ function openModal(id) {
   els.btnDeleteOne.hidden = deleted;
   els.btnUndoDelete.hidden = !deleted;
 
+  // ✅ Load reminders for this holiday (pending only)
+  try {
+    const original = await loadRemindersForHoliday(id);
+    state.reminderOriginal.set(id, original);
+
+    // if already edited, prefer edited list
+    const edited = state.reminderEdits.get(id);
+    state.modalReminders = (edited ? edited.slice() : original.slice());
+  } catch (e) {
+    console.error(e);
+    state.modalReminders = [];
+    toast(`โหลดแจ้งเตือนไม่สำเร็จ: ${e.message}`);
+  }
+
+  renderRemindersEditor();
+
   els.overlay.hidden = false;
   els.overlay.style.display = "flex";
 }
+
 
 function closeModal() {
   els.overlay.hidden = true;
@@ -279,6 +407,15 @@ function applyModal() {
     toast("เก็บการแก้ไขไว้แล้ว ✅");
   }
 
+  // ✅ Reminders dirty check
+  const newRems = (state.modalReminders || []).filter(Boolean);
+  const originalRems = state.reminderOriginal.get(id) || [];
+  if (sameReminderSet(newRems, originalRems)) {
+    state.reminderEdits.delete(id);
+  } else {
+    state.reminderEdits.set(id, newRems);
+  }
+
   render();
   closeModal();
 }
@@ -287,6 +424,8 @@ function applyModal() {
 function discardAll() {
   state.edits.clear();
   state.deletes.clear();
+  state.reminderEdits.clear();
+  state.reminderOriginal.clear();
   toast("ทิ้งการแก้ไขทั้งหมดแล้ว");
   render();
 }
@@ -306,6 +445,8 @@ async function loadList() {
 
   state.edits.clear();
   state.deletes.clear();
+  state.reminderEdits.clear();
+  state.reminderOriginal.clear();
 
   els.subtitle.textContent = `พบ ${state.items.length} รายการ`;
   toast(`โหลดแล้ว ${state.items.length} รายการ ✅`);
@@ -326,6 +467,20 @@ async function saveAll() {
       method: "POST",
       body: { updates, deletes },
     });
+
+
+    // ✅ apply reminder changes (replace pending reminders per holiday)
+    for (const [holidayId, remindAts] of state.reminderEdits.entries()) {
+      // if holiday is deleted, skip (delete already handles reminders)
+      if (state.deletes.has(holidayId)) continue;
+
+      const reminders = (remindAts || []).filter(Boolean).map((x) => ({ remind_at: x }));
+      await apiFetch(`/liff/holidays/reminders/set`, {
+        method: "POST",
+        body: { holiday_id: holidayId, reminders },
+      });
+    }
+
 
     toast("บันทึกสำเร็จ ✅🎉", 1800);
     els.subtitle.textContent = "บันทึกสำเร็จ ✅";
@@ -366,6 +521,25 @@ function bindUI() {
   });
 
   els.btnApply.onclick = applyModal;
+
+  // ✅ Reminder editor buttons (in modal)
+  if (els.btnAddReminder) {
+    els.btnAddReminder.onclick = () => {
+      const baseDate = els.mStart?.value || ymd(new Date());
+      const v = `${baseDate}T09:00`;
+      const iso = localInputToIsoBkk(v);
+      if (iso) state.modalReminders.push(iso);
+      renderRemindersEditor();
+    };
+  }
+  if (els.btnClearReminders) {
+    els.btnClearReminders.onclick = () => {
+      state.modalReminders = [];
+      renderRemindersEditor();
+      toast("ล้างแจ้งเตือนแล้ว");
+    };
+  }
+
 
   els.btnDeleteOne.onclick = () => {
     const id = state.currentId;

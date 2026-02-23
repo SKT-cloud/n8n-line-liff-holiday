@@ -78,11 +78,26 @@
       </div>
 
       <div class="mt12">
-        <label class="label">หมายเหตุ (optional)</label>
-        <textarea class="textarea" id="mNote" placeholder="รายละเอียดเพิ่มเติม…"></textarea>
-      </div>
+  <label class="label">หมายเหตุ (optional)</label>
+  <textarea class="textarea" id="mNote" placeholder="รายละเอียดเพิ่มเติม…"></textarea>
+</div>
 
-      <div class="modal__actions mt12">
+<div class="mt12">
+  <label class="label">แจ้งเตือน (Reminders)</label>
+  <p class="help">ตั้งเวลาแจ้งเตือนได้หลายอัน • ถ้าไม่ใส่ = ไม่แจ้งเตือน</p>
+
+  <div class="reminders" id="mRemindersWrap">
+    <div class="reminders__list" id="mRemindersList"></div>
+
+    <div class="reminders__actions">
+      <button class="btn btn--ghost" id="btnAddReminder" type="button">+ เพิ่มเวลาแจ้งเตือน</button>
+      <button class="btn btn--ghost" id="btnClearReminders" type="button">ล้างแจ้งเตือน</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal__actions mt12">
+
         <button class="btn btn--danger" id="btnDeleteOne" type="button">ลบรายการนี้</button>
         <button class="btn btn--ghost" id="btnUndoDelete" type="button" hidden>Undo ลบ</button>
         <button class="btn btn--primary" id="btnApply" type="button">บันทึกการแก้ไขรายการนี้</button>

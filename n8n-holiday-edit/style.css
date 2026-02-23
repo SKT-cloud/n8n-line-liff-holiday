@@ -278,3 +278,36 @@ body{
   background: #fee2e2;
   border-color: #fecaca;
 }
+
+/* === Reminders editor (modal) === */
+.reminders{
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px;
+  background: #fff;
+}
+.reminders__list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin-top: 8px;
+}
+.remRow{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.remInput{
+  flex: 1;
+}
+.remEmpty{
+  font-size: 12px;
+  color: var(--muted);
+  padding: 8px 4px;
+}
+.reminders__actions{
+  display:flex;
+  gap:10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
