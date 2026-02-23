@@ -200,7 +200,12 @@ function render(){
   updateFooter();
 }
 
-// --- modal controls ---
+/* =========================
+   ✅ MODAL (แก้หลัก)
+   - กัน modal โผล่เอง
+   - ปิดได้แน่นอน: ปุ่ม / คลิกพื้นหลัง / ESC
+   ========================= */
+
 function openModal(id){
   state.currentId = id;
   const it = state.items.find(x => x.id === id);
@@ -348,10 +353,17 @@ function bindUI(){
   els.btnDiscard.onclick = discardAll;
   els.btnSave.onclick = saveAll;
 
+  // ✅ ปิดด้วยปุ่ม
   els.btnCloseModal.onclick = closeModal;
 
+  // ✅ ปิดด้วยคลิกพื้นหลัง
   els.overlay.addEventListener("click", (e) => {
     if (e.target === els.overlay) closeModal();
+  });
+
+  // ✅ ปิดด้วย ESC
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !els.overlay.hidden) closeModal();
   });
 
   els.btnApply.onclick = applyModal;
@@ -389,7 +401,6 @@ async function initLiffLoginFirst(){
   // ต้องมี idToken (scope openid)
   getIdTokenOrThrow();
 
-  // profile เอาไว้ใช้ future (ถ้าจะโชว์ชื่อ)
   const profile = await liff.getProfile();
   state.userId = profile.userId;
 
@@ -398,6 +409,9 @@ async function initLiffLoginFirst(){
 
 // --- main ---
 (async function main(){
+  // ✅ บังคับปิด modal ตั้งแต่เริ่ม (กันโผล่ค้าง)
+  closeModal();
+
   // range: today-30 to today+90
   const now = new Date();
   const fromD = new Date(now); fromD.setDate(fromD.getDate() - 30);

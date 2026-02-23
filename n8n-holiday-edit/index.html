@@ -8,7 +8,7 @@
   <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
-  <link rel="stylesheet" href="./edit.css" />
+  <link rel="stylesheet" href="./style.css" />
 </head>
 
 <body>
@@ -51,12 +51,13 @@
   <div class="toast" id="toast" aria-live="polite"></div>
 
   <!-- Modal -->
-  <div class="overlay" id="overlay" hidden>
+  <!-- ✅ แก้ตรงนี้: เพิ่ม style="display:none;" เพื่อกันโผล่เอง -->
+  <div class="overlay" id="overlay" hidden style="display:none;">
     <div class="modal" role="dialog" aria-modal="true" aria-label="แก้ไขรายการ">
       <div class="modal__head">
         <div>
           <h3 class="h3" id="modalTitle">แก้ไขรายการ</h3>
-          <p class="help" id="modalMeta">—</p>
+          <p class="help" id="modalMeta"></p>
         </div>
         <button class="btn btn--ghost" id="btnCloseModal" type="button">ปิด</button>
       </div>
@@ -90,6 +91,6 @@
     </div>
   </div>
 
-  <script src="./edit.js"></script>
+  <script src="./script.js"></script>
 </body>
 </html>
