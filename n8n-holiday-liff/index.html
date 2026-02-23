@@ -117,13 +117,17 @@
       </div>
     </section>
 
-    <button id="submitBtn" class="btn" disabled>บันทึก</button>
+    <div class="formActions">
+  <button id="resetBtn" class="btn btn--ghost btn--sm" type="button">
+    ล้างฟอร์ม
+  </button>
 
-    <div id="msg" class="msg"></div>
+  <button id="submitBtn" class="btn btn--primary btn--sm" disabled>
+    บันทึก
+  </button>
+</div>
 
-    <div class="footer" style="margin-top:10px;">
-      <button id="resetBtn" class="btn btn--ghost" type="button">ล้างฟอร์ม</button>
-    </div>
+<div id="msg" class="msg"></div>
   </div>
 
   <script type="module" src="./js/main.js"></script>

@@ -533,3 +533,49 @@ input, select, textarea{
 }
 .remInlineActions{ margin-top:10px; }
 .remAddBtn{ margin-top:0; }
+
+/* =========================
+   Minimal form actions
+========================= */
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* ทำให้ปุ่มไม่ full width */
+.btn {
+  width: auto;
+}
+
+/* ปุ่มขนาดเล็ก */
+.btn--sm {
+  padding: 6px 16px;
+  font-size: 14px;
+  border-radius: 8px;
+  min-width: 88px;
+}
+
+/* primary แบบ minimal */
+.btn--primary {
+  background: #111;
+  color: #fff;
+  border: 1px solid #111;
+}
+
+.btn--primary:hover {
+  opacity: 0.9;
+}
+
+/* ghost เรียบ ๆ */
+.btn--ghost {
+  background: transparent;
+  border: 1px solid #ddd;
+  color: #444;
+}
+
+.btn--ghost:hover {
+  background: #f5f5f5;
+}
