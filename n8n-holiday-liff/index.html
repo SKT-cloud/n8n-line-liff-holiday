@@ -66,20 +66,24 @@
         <button id="remNoneBtn" type="button" class="segBtn isActive">ไม่ตั้งแจ้งเตือน</button>
         <button id="remSetBtn" type="button" class="segBtn">ตั้งแจ้งเตือน ⏰</button>
       </div>
-      <div id="remPicker" class="hidden"></div>
-    </section>
+      <div id="remPicker" class="remPicker hidden">
+  <div id="remList" class="remListInline" aria-label="รายการแจ้งเตือน"></div>
 
-    <div class="formActions">
-      <button id="resetBtn" class="btn btn--ghost btn--sm" type="button">
-        ล้างฟอร์ม
-      </button>
-      <button id="submitBtn" class="btn btn--primary btn--sm" disabled>
-        บันทึก
-      </button>
-    </div>
-
-    <div id="msg" class="msg"></div>
+  <div class="remInlineActions">
+    <button id="remAddBtn" type="button" class="btn btn--ghost remAddBtn">+ เพิ่มเวลาแจ้งเตือน</button>
   </div>
+
+  <small class="hint">ห้ามเลือกย้อนหลัง • ใส่ได้หลายเวลา ✅</small>
+</div>
+</section>
+
+<div class="formActions">
+  <button id="resetBtn" class="btn btn--ghost btn--sm" type="button">ล้างฟอร์ม</button>
+  <button id="submitBtn" class="btn btn--sm" disabled>บันทึก</button>
+</div>
+
+<div id="msg" class="msg"></div>
+</div>
 
   <script type="module" src="./js/main.js"></script>
 </body>
