@@ -2,109 +2,157 @@
 <html lang="th">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>แก้ไข / ลบวันหยุด</title>
-
-  <!-- LIFF SDK -->
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>แก้ไข / ลบวันหยุด • StudyBot</title>
 
   <link rel="stylesheet" href="./style.css" />
+
+  <!-- ✅ Flatpickr (เวลา 24h + UX กดง่าย) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+  <script defer src="./script.js"></script>
 </head>
 
 <body>
-  <header class="topbar">
-    <div class="container topbar__inner">
-      <div class="topbar__left">
-        <h1 class="h1">แก้ไข / ลบวันหยุด</h1>
-        <p class="sub" id="subtitle">กำลังโหลดข้อมูล…</p>
-      </div>
+  <div class="bg" aria-hidden="true"></div>
 
-      <div class="topbar__right">
-        <!-- Production: ไม่ต้องมีปุ่มตั้งค่า/โหลดใหม่ -->
-      </div>
+  <header class="topbar">
+    <div>
+      <h1 class="title">แก้ไข / ลบวันหยุด</h1>
+      <div class="subtitle">แตะ ✏️ เพื่อแก้ไข หรือ 🗑️ เพื่อลบ (รองรับแจ้งเตือน)</div>
     </div>
+    <div class="pill" id="userPill">...</div>
   </header>
 
-  <main class="container">
-    <!-- List -->
-    <section class="list" id="list"></section>
+  <main class="wrap">
+    <section class="card">
+      <div class="rowHead">
+        <div>
+          <div class="label">รายการวันหยุด</div>
+          <div class="help" id="listHint">กำลังโหลด...</div>
+        </div>
 
-    <!-- Empty -->
-    <section class="empty" id="empty" hidden>
-      <h2 class="h2">ยังไม่มีรายการในช่วงนี้</h2>
-      <p class="help">ถ้ายังไม่เคยเพิ่มวันหยุด/ยกคลาส ลองไปเพิ่มก่อนน้า 😊</p>
+        <div class="toolbar">
+          <button class="btnGhost" id="reloadBtn" type="button">รีเฟรช</button>
+        </div>
+      </div>
+
+      <div id="list" class="list"></div>
+
+      <div class="status" id="status"></div>
+
+      <div class="actions">
+        <button type="button" class="btnGhost" id="discardBtn">ทิ้งการแก้ไข</button>
+        <button type="button" class="btnPrimary" id="saveAllBtn">บันทึกทั้งหมด</button>
+      </div>
     </section>
+
+    <div class="footer">StudyBot • LIFF</div>
   </main>
 
-  <!-- Footer actions -->
-  <footer class="footerBar">
-    <div class="container footerBar__inner">
-      <div class="muted" id="countLabel">—</div>
-      <div class="footerBar__actions">
-        <button class="btn btn--ghost" id="btnDiscard" type="button">ทิ้งการแก้ไข</button>
-        <button class="btn btn--primary" id="btnSave" type="button" disabled>บันทึกทั้งหมด</button>
-      </div>
-    </div>
-  </footer>
+  <!-- ✅ Modal -->
+  <div class="modal" id="modal" hidden>
+    <div class="modalBackdrop" data-close="1"></div>
 
-  <!-- Toast -->
-  <div class="toast" id="toast" aria-live="polite"></div>
-
-  <!-- Modal -->
-  <div class="overlay" id="overlay" hidden style="display:none;">
-    <div class="modal" role="dialog" aria-modal="true" aria-label="แก้ไขรายการ">
-      <div class="modal__head">
+    <div class="modalSheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modalTop">
         <div>
-          <h3 class="h3" id="modalTitle">แก้ไขรายการ</h3>
-          <p class="help" id="modalMeta"></p>
+          <div class="modalTitle" id="modalTitle">แก้ไขรายการ</div>
+          <div class="modalSub" id="modalSub">—</div>
         </div>
-        <button class="btn btn--ghost" id="btnCloseModal" type="button">ปิด</button>
+        <button class="iconBtn" type="button" data-close="1" aria-label="ปิด">✕</button>
       </div>
 
-      <div class="grid2 mt12">
-        <div>
-          <label class="label">วันที่เริ่ม</label>
+      <div class="modalBody">
+        <!-- ✅ ประเภท: เปลี่ยนได้ -->
+        <div class="row">
+          <div class="label">ประเภท</div>
+          <select class="input" id="mType">
+            <option value="cancel">🚫 ยกคลาส</option>
+            <option value="holiday">🏝️ หยุดทั้งวัน</option>
+          </select>
+          <div class="help" id="typeHint">—</div>
+        </div>
+
+        <!-- ✅ โหมด cancel: เลือกวิชา -->
+        <div class="row" id="subjectWrap" hidden>
+          <div class="label">วิชา (สำหรับยกคลาส)</div>
+          <select class="input" id="mSubject">
+            <option value="">กำลังโหลด...</option>
+          </select>
+          <div class="help" id="subjectHint"></div>
+        </div>
+
+        <!-- ✅ โหมด cancel: วันที่ยกคลาส (บังคับตามวันเรียนของวิชา) -->
+        <div class="row" id="cancelDateWrap" hidden>
+          <div class="label">วันที่ยกคลาส</div>
+          <div class="pill" id="cancelDatePill">ยังไม่ได้เลือก</div>
+          <input type="hidden" id="mCancelYmd" />
+          <div class="help" id="cancelHint">เลือกได้เฉพาะวันเรียนของวิชาที่เลือกเท่านั้น</div>
+
+          <div class="calWrap" id="calWrap">
+            <div class="calTop">
+              <button class="btnGhost calBtn" id="calPrev" type="button">‹</button>
+              <div class="calTitle" id="calTitle">—</div>
+              <button class="btnGhost calBtn" id="calNext" type="button">›</button>
+            </div>
+            <div class="calGrid" id="calGrid"></div>
+          </div>
+        </div>
+
+        <!-- ✅ โหมด holiday: วันที่เริ่ม/สิ้นสุด -->
+        <div class="row" id="holidayDatesWrap">
+          <div class="label">วันที่เริ่ม</div>
           <input class="input" type="date" id="mStart" />
         </div>
-        <div>
-          <label class="label">วันที่สิ้นสุด (ไม่ใส่ = วันเดียว)</label>
+
+        <div class="row" id="endWrap">
+          <div class="label">วันที่สิ้นสุด (เว้นได้ = วันเดียว)</div>
           <input class="input" type="date" id="mEnd" />
+        </div>
+
+        <div class="row">
+          <div class="label">หัวข้อ (ปล่อยว่างได้)</div>
+          <input class="input" id="mTitle" placeholder="เช่น ป่วย / ไปอบรม" />
+        </div>
+
+        <div class="row">
+          <div class="label">หมายเหตุ (optional)</div>
+          <textarea class="input" id="mNote" placeholder="รายละเอียดเพิ่มเติม..."></textarea>
+        </div>
+
+        <div class="row">
+          <div class="rowHead">
+            <div>
+              <div class="label">แจ้งเตือน</div>
+              <div class="help">เพิ่มได้หลายอัน • ถ้าไม่ใส่ = ไม่แจ้งเตือน</div>
+            </div>
+            <button class="btnGhost" id="mAddRem" type="button">＋ เพิ่มเวลา</button>
+          </div>
+
+          <div id="mRemList"></div>
+        </div>
+
+        <div class="row">
+          <div class="dangerZone">
+            <div>
+              <div class="label">ลบรายการนี้</div>
+              <div class="help">ลบแล้วจะหายจากระบบทันที</div>
+            </div>
+            <button type="button" class="btnDanger" id="mDelete">ลบรายการนี้</button>
+          </div>
         </div>
       </div>
 
-      <div class="mt12">
-        <label class="label">หัวข้อ (ปล่อยว่างได้)</label>
-        <input class="input" type="text" id="mTitle" placeholder="เช่น สอบ / งานพิเศษ / ไปต่างจังหวัด" />
-      </div>
-
-      <div class="mt12">
-  <label class="label">หมายเหตุ (optional)</label>
-  <textarea class="textarea" id="mNote" placeholder="รายละเอียดเพิ่มเติม…"></textarea>
-</div>
-
-<div class="mt12">
-  <label class="label">แจ้งเตือน (Reminders)</label>
-  <p class="help">ตั้งเวลาแจ้งเตือนได้หลายอัน • ถ้าไม่ใส่ = ไม่แจ้งเตือน</p>
-
-  <div class="reminders" id="mRemindersWrap">
-    <div class="reminders__list" id="mRemindersList"></div>
-
-    <div class="reminders__actions">
-      <button class="btn btn--ghost" id="btnAddReminder" type="button">+ เพิ่มเวลาแจ้งเตือน</button>
-      <button class="btn btn--ghost" id="btnClearReminders" type="button">ล้างแจ้งเตือน</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal__actions mt12">
-
-        <button class="btn btn--danger" id="btnDeleteOne" type="button">ลบรายการนี้</button>
-        <button class="btn btn--ghost" id="btnUndoDelete" type="button" hidden>Undo ลบ</button>
-        <button class="btn btn--primary" id="btnApply" type="button">บันทึกการแก้ไขรายการนี้</button>
+      <div class="modalFoot">
+        <button type="button" class="btnGhost" data-close="1">ปิด</button>
+        <button type="button" class="btnPrimary" id="mApply">บันทึกการแก้ไขรายการนี้</button>
       </div>
     </div>
   </div>
 
-  <script src="./script.js"></script>
+  <div id="toast" class="toast" hidden></div>
 </body>
 </html>
