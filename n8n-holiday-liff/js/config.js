@@ -3,13 +3,15 @@ export const CONFIG = {
   WORKER_BASE: "https://study-holiday-api.suwijuck-kat.workers.dev",
 
   // ✅ LIFF IDs (ของคุณ)
-  LIFF_ID_ADD: "2009146879-xoNc2sVq",      // StudyBot holiday
-  LIFF_ID_EDIT: "2009146879-3eBGpF5j",    // StudyBot holiday edit
+  LIFF_ID_ADD: "2009146879-xoNc2sVq",
+  LIFF_ID_EDIT: "2009146879-3eBGpF5j",
 
-  // mode: "add" | "edit"  (เลือกจาก pathname)
+  // optional: ถ้าจะให้ worker push confirm เอง (ตั้งใน worker env PUSH_ON_SAVE=1)
+  PUSH_ON_SAVE: false,
+
   getMode() {
     const p = (location.pathname || "/").toLowerCase();
-    if (p.endsWith("/edit.html") || p.endsWith("/edit") || p.includes("edit")) return "edit";
+    if (p.includes("edit")) return "edit";
     return "add";
   },
 

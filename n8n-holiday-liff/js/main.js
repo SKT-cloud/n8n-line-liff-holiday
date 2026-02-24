@@ -1,7 +1,7 @@
-import { CONFIG } from "./config.js?v=20260224_02";
-import { initLiff } from "./auth.js?v=20260224_02";
-import { fetchSubjects, createHoliday } from "./api.js?v=20260224_01";
-import { initForm } from "./form.js?v=20260224_01";
+import { CONFIG } from "./config.js";
+import { initLiff } from "./auth.js";
+import { fetchSubjects, createHoliday } from "./api.js";
+import { bindForm } from "./form.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -21,119 +21,146 @@ function setStatus(text) {
   el.textContent = text || "";
 }
 
-function ymdToDDMMYYYY(ymd) {
-  if (!ymd) return "-";
-  const [y, m, d] = String(ymd).split("-");
-  if (!y || !m || !d) return "-";
-  return `${d}/${m}/${y}`;
+function relogin() {
+  toast("เซสชันหมดอายุ กำลังพาไปล็อกอินใหม่…", "err");
+  try { window.liff.logout(); } catch(_) {}
+  window.liff.login({ redirectUri: location.href });
 }
 
-function buildConfirmText(payload) {
-  const typeText = payload.type === "cancel" ? "ยกคลาส" : "หยุดทั้งวัน";
-  const s = (payload.start_at || "").slice(0, 10);
-  const e = (payload.end_at || "").slice(0, 10);
-  const dateText =
-    s && e ? (s === e ? ymdToDDMMYYYY(s) : `${ymdToDDMMYYYY(s)} – ${ymdToDDMMYYYY(e)}`) : "-";
-  const remindCount = Array.isArray(payload.reminders) ? payload.reminders.length : 0;
-
-  return [
-    "ยืนยันการบันทึกใช่ไหม?",
-    "",
-    `ประเภท: ${typeText}`,
-    `วันที่: ${dateText}`,
-    `หัวข้อ: ${payload.title || "-"}`,
-    `แจ้งเตือน: ${remindCount ? `${remindCount} เวลา` : "ไม่แจ้งเตือน"}`,
-  ].join("\n");
+function daySort(d){
+  const order = ["จันทร์","อังคาร","พุธ","พฤหัสบดี","พฤ","ศุกร์","เสาร์","อาทิตย์","อื่นๆ"];
+  const i = order.indexOf(d);
+  return i === -1 ? 999 : i;
 }
 
-async function closeLiffSafely() {
-  try {
-    if (window.liff?.isInClient?.() === true) {
-      window.liff.closeWindow();
-      return true;
-    }
-  } catch {}
-  return false;
+function renderSubjects(items){
+  const list = $("#subjectList");
+  if (!list) return;
+
+  list.innerHTML = "";
+  if (!items.length) {
+    list.innerHTML = `<div class="empty">ยังไม่มีข้อมูลวิชาในระบบ 😅</div>`;
+    return;
+  }
+
+  const grouped = new Map();
+  for (const it of items) {
+    const day = it.day || "อื่นๆ";
+    if (!grouped.has(day)) grouped.set(day, []);
+    grouped.get(day).push(it);
+  }
+
+  [...grouped.entries()]
+    .sort((a,b)=>daySort(a[0]) - daySort(b[0]))
+    .forEach(([day, arr]) => {
+      arr.sort((a,b) =>
+        String(a.start_time||"").localeCompare(String(b.start_time||"")) ||
+        String(a.subject_code||"").localeCompare(String(b.subject_code||""))
+      );
+
+      const sec = document.createElement("section");
+      sec.className = "dayGroup";
+      sec.innerHTML = `<div class="dayHead">${day}</div>`;
+
+      const grid = document.createElement("div");
+      grid.className = "subGrid";
+
+      for (const s of arr) {
+        const payload = {
+          subject_code: s.subject_code,
+          subject_name: s.subject_name,
+          section: s.section,
+          type: s.type,
+          room: s.room,
+          start_time: s.start_time,
+          end_time: s.end_time,
+          day: s.day,
+          semester: s.semester,
+          instructor: s.instructor,
+        };
+
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "subCard";
+        card.dataset.key = `${s.day}|${s.start_time}|${s.subject_code}|${s.section}|${s.type}`;
+        card.dataset.payload = JSON.stringify(payload);
+
+        card.innerHTML = `
+          <div class="subTime">${(s.start_time||"??:??")}–${(s.end_time||"??:??")}</div>
+          <div class="subCode">${s.subject_code || ""} <span class="subType">${s.type || ""}</span></div>
+          <div class="subName">${s.subject_name || ""}</div>
+          <div class="subMeta">${s.room ? `ห้อง ${s.room}` : ""}</div>
+          <div class="subTick">✓</div>
+        `;
+
+        grid.appendChild(card);
+      }
+
+      sec.appendChild(grid);
+      list.appendChild(sec);
+    });
 }
 
 async function run() {
   try {
-    setStatus("กำลังเปิดฟอร์ม…");
+    setStatus("กำลังเปิดฟอร์ม...");
 
-    const session = await initLiff();
-    if (!session) return; // redirect to login
-    const { idToken, profile } = session;
+    const { idToken, profile } = await initLiff();
+    if (!idToken) return; // login redirected
 
-    const pill = $("#profileName");
-    if (pill) pill.textContent = profile?.displayName || "ผู้ใช้";
+    const userPill = $("#userPill");
+    if (userPill) userPill.textContent = profile?.displayName || "คุณ";
 
-    // preview date format
-    const startDate = $("#startDate");
-    const endDate = $("#endDate");
-    const startPreview = $("#startPreview");
-    const endPreview = $("#endPreview");
-    const updatePreview = () => {
-      if (startPreview) startPreview.textContent = startDate?.value ? ymdToDDMMYYYY(startDate.value) : "-";
-      if (endPreview) endPreview.textContent = endDate?.value ? ymdToDDMMYYYY(endDate.value) : "-";
-    };
-    startDate?.addEventListener("change", updatePreview);
-    endDate?.addEventListener("change", updatePreview);
-    updatePreview();
-
-    // load subjects (ถ้าเจอ IdToken expired → force relogin)
-    setStatus("กำลังโหลดตารางวิชา…");
+    // load subjects
+    setStatus("กำลังโหลดตารางวิชา...");
     let items = [];
     try {
       items = await fetchSubjects({ idToken });
-    } catch (e) {
-      const msg = e?.message || String(e);
-      if (/IdToken expired/i.test(msg)) {
-        toast("โทเคนหมดอายุ กำลังเข้าสู่ระบบใหม่…", "info");
-        await initLiff({ forceRelogin: true });
+    } catch (err) {
+      if (err?.code === "IDTOKEN_EXPIRED" || err?.message === "IDTOKEN_EXPIRED") {
+        relogin();
         return;
       }
-      throw e;
+      throw err;
     }
 
     const subjectsStatus = $("#subjectsStatus");
-    if (subjectsStatus) subjectsStatus.textContent = items.length ? `มี ${items.length} รายวิชา` : "ยังไม่มีรายวิชาในระบบ";
+    if (subjectsStatus) subjectsStatus.textContent = items.length ? `มี ${items.length} รายวิชา` : "ยังไม่มีข้อมูลวิชาในระบบ 😅";
+    renderSubjects(items);
 
     setStatus("");
 
-    initForm({
-      el: document,
-      mode: CONFIG.getMode(),
-      profile,
-      subjects: items,
+    bindForm({
       onSubmit: async (payload) => {
-        const ok = window.confirm(buildConfirmText(payload));
-        if (!ok) {
-          toast("ยกเลิกแล้ว 👌", "info");
-          return;
-        }
+        // confirm ก่อนบันทึก
+        const ok = window.confirm("ยืนยันการบันทึกใช่ไหม?\n\nกด “ตกลง” เพื่อบันทึก หรือ “ยกเลิก” เพื่อกลับไปแก้ไข");
+        if (!ok) return;
 
+        setStatus("กำลังบันทึก...");
         try {
-          setStatus("กำลังบันทึก…");
-          toast("กำลังบันทึก…", "info");
-
           await createHoliday({ idToken, payload });
-
-          setStatus("");
-          toast("บันทึกสำเร็จ ✅", "ok");
-          setTimeout(() => closeLiffSafely(), 650);
-        } catch (e) {
-          const msg = e?.message || String(e);
-          if (/IdToken expired/i.test(msg)) {
-            toast("โทเคนหมดอายุ กำลังเข้าสู่ระบบใหม่…", "info");
-            await initLiff({ forceRelogin: true });
+        } catch (err) {
+          if (err?.code === "IDTOKEN_EXPIRED" || err?.message === "IDTOKEN_EXPIRED") {
+            relogin();
             return;
           }
-          console.error(e);
-          setStatus("");
-          toast(msg, "err");
+          throw err;
         }
+
+        toast("บันทึกสำเร็จ ✅", "ok");
+        setStatus("");
+
+        // close LIFF after save
+        try { window.liff.closeWindow(); } catch(_) {}
       },
+      onTokenExpired: relogin,
+      onError: (err) => {
+        console.error(err);
+        toast(err?.message || String(err), "err");
+        setStatus("");
+      }
     });
+
   } catch (e) {
     console.error(e);
     setStatus("");
