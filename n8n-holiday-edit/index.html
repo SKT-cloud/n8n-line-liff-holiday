@@ -5,10 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>แก้ไข / ลบวันหยุด • StudyBot</title>
 
-  <!-- ✅ ตั้งค่า LIFF ID (ใส่ของคุณเอง) -->
+  <!-- ✅ ตั้งค่า LIFF ID + Worker API Base -->
   <script>
-    // ใส่ LIFF ID ของหน้า "แก้ไข/ลบวันหยุด" (เช่น 200xxxxxxxxx-xxxxxxxx)
+    // LIFF ID ของหน้า "แก้ไข/ลบวันหยุด"
     window.__LIFF_ID__ = "2009146879-3eBGpF5j";
+
+    // ✅ Worker URL (สำคัญมาก: ต้องเป็น Worker ไม่ใช่ Pages)
+    window.__API_BASE__ = "https://study-holiday-api.suwijuck-kat.workers.dev";
   </script>
 
   <link rel="stylesheet" href="./style.css" />

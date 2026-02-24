@@ -1,29 +1,28 @@
-/* =========================================================
-   StudyBot LIFF: แก้ไข / ลบวันหยุด (Edit Page)
-   - ใช้ worker endpoints: /liff/subjects, /liff/holidays/list, /update, /delete,
-                           /liff/holidays/reminders/list, /liff/holidays/reminders/set
-   - Flatpickr 24h (ไม่มี AM/PM)
-   - Cancel (ยกคลาส): เลือกวิชา + ปฏิทินบังคับวันตรงกับวันเรียน
-   - Holiday (หยุดทั้งวัน): วันที่เริ่ม/สิ้นสุด
-========================================================= */
-
 "use strict";
 
 /* =========================
    Config
    ========================= */
-
-// ✅ ต้องมี liffId สำหรับ liff.init()
-// - ใส่ใน index.html: window.__LIFF_ID__ = "200xxxxxxxxx-xxxxxxxx"
-// - หรือส่งผ่าน querystring: ?liffId=200...
 const LIFF_ID_FROM_WINDOW = (typeof window !== "undefined" && window.__LIFF_ID__)
   ? String(window.__LIFF_ID__).trim()
   : "";
 const LIFF_ID_FROM_QS = new URLSearchParams(location.search).get("liffId") || "";
 const LIFF_ID = LIFF_ID_FROM_WINDOW || LIFF_ID_FROM_QS;
 
-// ตั้งค่า Worker base (ถ้าใช้โดเมนเดียวกัน ปล่อยว่างได้)
-const API_BASE = ""; // เช่น "https://your-worker.your-domain.workers.dev"
+const API_BASE_FROM_WINDOW = (typeof window !== "undefined" && window.__API_BASE__)
+  ? String(window.__API_BASE__).trim()
+  : "";
+const API_BASE_FROM_QS = new URLSearchParams(location.search).get("apiBase") || "";
+
+function normalizeBase(u) {
+  const s = (u || "").trim();
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s)) return s.replace(/\/+$/, "");
+  return `https://${s.replace(/\/+$/, "")}`;
+}
+
+const API_BASE = normalizeBase(API_BASE_FROM_WINDOW || API_BASE_FROM_QS);
+if (!API_BASE) console.warn("API_BASE is empty -> will hit Pages origin (wrong).");
 
 /* =========================
    Helpers
@@ -70,10 +69,8 @@ function dateToYmdHmLocal(d) {
 }
 
 function nowBangkok() {
-  // ใช้เวลาท้องถิ่นของเครื่องผู้ใช้ (ซึ่งคุณอยู่ไทย) + รูปแบบเพียงพอสำหรับ UI
   return new Date();
 }
-
 function startOfMonth(d) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
@@ -82,7 +79,6 @@ function addMonths(d, n) {
 }
 
 function thaiDowIndexFromSubjectDay(day) {
-  // day ใน subjects: "จันทร์","อังคาร","พุธ","พฤ","พฤหัสบดี","ศุกร์","เสาร์","อาทิตย์"
   const map = {
     "อาทิตย์": 0,
     "จันทร์": 1,
@@ -97,33 +93,57 @@ function thaiDowIndexFromSubjectDay(day) {
 }
 
 function toIsoBangkokAllDayStart(ymd) {
-  // yyyy-mm-ddT00:00:00+07:00
   return `${ymd}T00:00:00+07:00`;
 }
 function toIsoBangkokAllDayEnd(ymd) {
-  // yyyy-mm-ddT23:59:59+07:00
   return `${ymd}T23:59:59+07:00`;
 }
 
 /* =========================
+   State
+   ========================= */
+const state = {
+  // ✅ ใช้ access token เป็นหลัก (ทนกว่า idToken ที่หมดอายุง่ายใน flow คุณ)
+  token: "",
+  idToken: "",
+  profile: null,
+
+  subjects: [],
+  holidays: [],
+
+  editing: null,
+  editingType: "cancel",
+  allowDow: null,
+  calMonth: startOfMonth(nowBangkok()),
+  cancelYmd: null,
+};
+
+/* =========================
    API (Worker)
    ========================= */
-
 async function apiFetch(path, opts = {}) {
-  const url = new URL(path, API_BASE || location.origin);
+  const base = API_BASE || location.origin;
+  const url = new URL(path, base);
 
   const headers = new Headers(opts.headers || {});
-  if (state.idToken) headers.set("Authorization", `Bearer ${state.idToken}`);
+  // ✅ ส่ง token (access token เป็นหลัก)
+  if (state.token) headers.set("Authorization", `Bearer ${state.token}`);
   if (!headers.has("Content-Type") && opts.body) headers.set("Content-Type", "application/json");
 
-  const res = await fetch(url.toString(), {
-    ...opts,
-    headers,
-  });
+  const res = await fetch(url.toString(), { ...opts, headers });
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = data?.error || data?.message || `HTTP ${res.status}`;
+
+    // ✅ ถ้า token ใช้ไม่ได้ ให้ login ใหม่เลย (แก้กรณี access token หมดอายุ)
+    if (res.status === 401) {
+      console.warn("401 from worker:", msg);
+      toast(`เซสชันหมดอายุ กำลังพา login ใหม่...`, "err");
+      try { liff.logout(); } catch {}
+      try { liff.login(); } catch {}
+    }
+
     throw new Error(msg);
   }
   return data;
@@ -133,22 +153,23 @@ async function fetchSubjects() {
   const data = await apiFetch("/liff/subjects", { method: "GET" });
   return Array.isArray(data.items) ? data.items : [];
 }
-
 async function fetchHolidaysRange(fromIso, toIso) {
-  const u = new URL("/liff/holidays/list", API_BASE || location.origin);
+  const base = API_BASE || location.origin;
+  const u = new URL("/liff/holidays/list", base);
   u.searchParams.set("from", fromIso);
   u.searchParams.set("to", toIso);
+
   const data = await apiFetch(u.pathname + "?" + u.searchParams.toString(), { method: "GET" });
   return Array.isArray(data.items) ? data.items : [];
 }
-
 async function fetchReminders(holidayId) {
-  const u = new URL("/liff/holidays/reminders/list", API_BASE || location.origin);
+  const base = API_BASE || location.origin;
+  const u = new URL("/liff/holidays/reminders/list", base);
   u.searchParams.set("holiday_id", String(holidayId));
+
   const data = await apiFetch(u.pathname + "?" + u.searchParams.toString(), { method: "GET" });
   return Array.isArray(data.items) ? data.items : [];
 }
-
 async function setReminders(holidayId, reminderIsoList) {
   return apiFetch("/liff/holidays/reminders/set", {
     method: "POST",
@@ -158,14 +179,12 @@ async function setReminders(holidayId, reminderIsoList) {
     }),
   });
 }
-
 async function updateHoliday(payload) {
   return apiFetch("/liff/holidays/update", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
-
 async function deleteHoliday(id) {
   return apiFetch("/liff/holidays/delete", {
     method: "POST",
@@ -174,34 +193,15 @@ async function deleteHoliday(id) {
 }
 
 /* =========================
-   State
-   ========================= */
-const state = {
-  idToken: "",
-  profile: null,
-
-  subjects: [],
-  holidays: [],
-
-  // modal
-  editing: null,        // current holiday row
-  editingType: "cancel",
-  allowDow: null,       // 0..6 for cancel, from subject day
-  calMonth: startOfMonth(nowBangkok()),
-  cancelYmd: null,      // selected cancel date YYYY-MM-DD
-};
-
-/* =========================
    Flatpickr (Reminders)
    ========================= */
-
 function initReminderPicker(inputEl) {
   if (!window.flatpickr) return;
   if (inputEl._fp) return;
 
   inputEl._fp = flatpickr(inputEl, {
     enableTime: true,
-    time_24hr: true,          // ✅ ไม่มี AM/PM
+    time_24hr: true,
     minuteIncrement: 5,
     allowInput: true,
     dateFormat: "Y-m-d H:i",
@@ -209,10 +209,7 @@ function initReminderPicker(inputEl) {
     altFormat: "d/m/Y H:i",
   });
 
-  // ให้ altInput ใช้ theme เดียวกับ .input
-  if (inputEl._fp?.altInput) {
-    inputEl._fp.altInput.classList.add("input");
-  }
+  if (inputEl._fp?.altInput) inputEl._fp.altInput.classList.add("input");
 }
 
 function addReminderRow(initialIso = null) {
@@ -232,11 +229,8 @@ function addReminderRow(initialIso = null) {
   del.textContent = "🗑️";
   del.title = "ลบเวลาแจ้งเตือน";
 
-  del.addEventListener("click", () => {
-    row.remove();
-  });
+  del.addEventListener("click", () => row.remove());
 
-  // ✅ append เข้า DOM ก่อนค่อย init flatpickr
   row.appendChild(inp);
   row.appendChild(del);
   wrap.appendChild(row);
@@ -246,15 +240,12 @@ function addReminderRow(initialIso = null) {
   if (initialIso) {
     const ymd = String(initialIso).slice(0, 10);
     const hm = String(initialIso).slice(11, 16);
-    const v = `${ymd} ${hm}`;
-    inp._fp?.setDate(v, true, "Y-m-d H:i");
+    inp._fp?.setDate(`${ymd} ${hm}`, true, "Y-m-d H:i");
   } else {
-    // default = now + 1 hour
     const dt = new Date(Date.now() + 60 * 60 * 1000);
     dt.setMinutes(Math.round(dt.getMinutes() / 5) * 5);
     dt.setSeconds(0);
-    const defaultValue = dateToYmdHmLocal(dt);
-    inp._fp?.setDate(defaultValue, true, "Y-m-d H:i");
+    inp._fp?.setDate(dateToYmdHmLocal(dt), true, "Y-m-d H:i");
   }
 }
 
@@ -274,19 +265,10 @@ function collectReminderIsoList() {
     const input = row.querySelector("input");
     if (!input) return;
 
-    // flatpickr instance on original input
     const fp = input._fp || input._flatpickr;
-    let dateObj = fp?.selectedDates?.[0] || null;
-
-    // fallback: parse from input value (Y-m-d H:i)
-    if (!dateObj) {
-      const raw = (input.value || "").trim();
-      const m = raw.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})$/);
-      if (m) dateObj = new Date(`${m[1]}T${m[2]}:00`);
-    }
+    const dateObj = fp?.selectedDates?.[0] || null;
     if (!dateObj) return;
 
-    // ทำเป็น ISO +07:00
     const ymd = dateToYmdLocal(dateObj);
     const hh = String(dateObj.getHours()).padStart(2, "0");
     const mi = String(dateObj.getMinutes()).padStart(2, "0");
@@ -317,10 +299,8 @@ function renderCalendar() {
   const mo = m.getMonth();
 
   title.textContent = `${m.toLocaleString("en-US", { month: "long" })} ${y}`;
-
   grid.innerHTML = "";
 
-  // header DOW
   for (const d of ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]) {
     const h = document.createElement("div");
     h.className = "calDow";
@@ -329,52 +309,43 @@ function renderCalendar() {
   }
 
   const first = new Date(y, mo, 1);
-  const startDow = first.getDay(); // 0..6
+  const startDow = first.getDay();
   const daysInMonth = new Date(y, mo + 1, 0).getDate();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // previous month padding
   const prevDays = startDow;
   const prevMonthDays = new Date(y, mo, 0).getDate();
 
   const cells = [];
-
   for (let i = 0; i < prevDays; i++) {
     const dayNum = prevMonthDays - prevDays + 1 + i;
-    const d = new Date(y, mo - 1, dayNum);
-    cells.push({ date: d, other: true });
+    cells.push({ date: new Date(y, mo - 1, dayNum), other: true });
   }
   for (let i = 1; i <= daysInMonth; i++) {
-    const d = new Date(y, mo, i);
-    cells.push({ date: d, other: false });
+    cells.push({ date: new Date(y, mo, i), other: false });
   }
-  // next month padding to fill grid (6 rows * 7 = 42) after header
   while (cells.length < 42) {
     const last = cells[cells.length - 1].date;
-    const d = new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1);
-    cells.push({ date: d, other: true });
+    cells.push({ date: new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1), other: true });
   }
 
-  const allowDow = state.allowDow; // null means not ready
+  const allowDow = state.allowDow;
 
   cells.forEach(({ date, other }) => {
     const btn = document.createElement("div");
     btn.className = "calDay";
     btn.textContent = String(date.getDate());
-
     if (other) btn.classList.add("isOtherMonth");
 
-    // disable past
     const d0 = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const isPast = d0.getTime() < today.getTime();
 
-    // enforce dow for cancel
     const dow = date.getDay();
     const notMatch = (allowDow === null) ? true : (dow !== allowDow);
-
     const disabled = isPast || notMatch;
+
     if (disabled) btn.classList.add("isDisabled");
 
     const ymd = dateToYmdLocal(d0);
@@ -393,9 +364,7 @@ function renderCalendar() {
 
 function autoSelectNextValidCancelDate() {
   if (state.allowDow === null) return;
-
-  const base = new Date();
-  base.setHours(0, 0, 0, 0);
+  const base = new Date(); base.setHours(0, 0, 0, 0);
 
   for (let i = 0; i < 90; i++) {
     const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
@@ -418,325 +387,229 @@ function typeBadge(type) {
 function itemTitle(row) {
   const t = (row.title || "").trim();
   if (t) return t;
-  return row.type === "cancel" ? "ยกคลาส" : "วันหยุด";
+  return row.type === "cancel" ? "(ยกคลาส)" : "(หยุดทั้งวัน)";
 }
 
-function itemDateText(row) {
-  const s = String(row.start_at || "").slice(0, 10);
-  const e = String(row.end_at || "").slice(0, 10);
-  if (!s) return "-";
-  if (e && e !== s) return `${ymdToThai(s)} – ${ymdToThai(e)}`;
-  return ymdToThai(s);
+function itemSub(row) {
+  const s = row.start_at ? isoToThaiDateTime(row.start_at) : "-";
+  const e = row.end_at ? isoToThaiDateTime(row.end_at) : "-";
+  if (row.type === "cancel") return `วัน: ${s}`;
+  if (s === e) return `วัน: ${s}`;
+  return `ช่วง: ${s} → ${e}`;
 }
 
 function renderList() {
-  const list = $("#list");
+  const el = $("#list");
   const hint = $("#listHint");
-  if (!list || !hint) return;
+  if (!el) return;
 
   if (!state.holidays.length) {
     hint.textContent = "ไม่พบรายการในช่วงนี้";
-    list.innerHTML = `<div class="empty">ยังไม่มีวันหยุด/ยกคลาสในช่วงที่เลือก</div>`;
+    el.innerHTML = `<div class="empty">ไม่มีรายการวันหยุด/ยกคลาสในช่วงนี้</div>`;
     return;
   }
 
   hint.textContent = `พบ ${state.holidays.length} รายการ`;
-  list.innerHTML = "";
 
-  state.holidays.forEach((row) => {
-    const div = document.createElement("div");
-    div.className = "item";
-
-    div.innerHTML = `
-      <div class="itemTop">
-        <div>
-          <div class="itemTitle">${itemTitle(row)}</div>
-          <div class="itemMeta">#${row.id} • ${itemDateText(row)}</div>
-          <div class="badges">${typeBadge(row.type)}</div>
-        </div>
-        <div class="itemBtns">
-          <button class="iconBtn" data-act="edit" title="แก้ไข">✏️</button>
-          <button class="iconBtn danger" data-act="del" title="ลบ">🗑️</button>
-        </div>
+  el.innerHTML = state.holidays.map((row) => `
+    <div class="item">
+      <div class="itemMain">
+        <div class="itemTitle">${itemTitle(row)}</div>
+        <div class="itemSub">${typeBadge(row.type)} <span class="sep">•</span> ${itemSub(row)}</div>
       </div>
-    `;
+      <div class="itemActions">
+        <button class="iconBtn" data-act="edit" data-id="${row.id}" type="button" title="แก้ไข">✏️</button>
+        <button class="iconBtn danger" data-act="del" data-id="${row.id}" type="button" title="ลบ">🗑️</button>
+      </div>
+    </div>
+  `).join("");
 
-    div.querySelector('[data-act="edit"]').addEventListener("click", () => openEdit(row));
-    div.querySelector('[data-act="del"]').addEventListener("click", async () => {
-      if (!confirm(`ลบรายการ #${row.id} ใช่ไหม?`)) return;
-      try {
-        await deleteHoliday(row.id);
-        toast("ลบรายการเรียบร้อย ✅");
-        await loadList();
-      } catch (e) {
-        toast(`ลบไม่สำเร็จ: ${e.message}`, "err");
+  el.querySelectorAll("[data-act]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const act = btn.getAttribute("data-act");
+      const id = Number(btn.getAttribute("data-id"));
+      const row = state.holidays.find((x) => Number(x.id) === id);
+      if (!row) return;
+
+      if (act === "del") {
+        if (!confirm("ยืนยันลบรายการนี้?")) return;
+        try {
+          await deleteHoliday(id);
+          toast("ลบแล้ว ✅");
+          await loadList();
+        } catch (e) {
+          toast(`ลบไม่สำเร็จ: ${e.message}`, "err");
+        }
+      } else if (act === "edit") {
+        openModal(row);
       }
     });
-
-    list.appendChild(div);
   });
 }
 
 /* =========================
-   Modal (Edit)
+   Modal Edit (เหมือนเดิม)
    ========================= */
-
-function openModal(show) {
-  const m = $("#modal");
-  if (!m) return;
-  m.hidden = !show;
-}
-
-function setTypeUI(type) {
-  state.editingType = type;
-
-  const cancelBox = $("#cancelBox");
-  const holidayBox = $("#holidayBox");
-  if (cancelBox) cancelBox.hidden = (type !== "cancel");
-  if (holidayBox) holidayBox.hidden = (type !== "holiday");
-
-  if (type === "cancel") {
-    // ปรับปฏิทินใหม่ตามวิชา
-    renderCalendar();
-  }
-}
-
-function fillSubjectSelect(selectedSubjectId) {
-  const sel = $("#mSubject");
-  const hint = $("#mSubjectHint");
-  if (!sel || !hint) return;
-
-  sel.innerHTML = "";
-
-  if (!state.subjects.length) {
-    hint.textContent = "ยังไม่พบรายชื่อวิชา (ตรวจว่า LIFF token ถูกส่งไป Worker ได้ไหม)";
-    const opt = document.createElement("option");
-    opt.value = "";
-    opt.textContent = "— ไม่มีวิชา —";
-    sel.appendChild(opt);
-    sel.disabled = true;
-    return;
-  }
-
-  sel.disabled = false;
-  hint.textContent = "เลือกเพื่อเปลี่ยนวิชาได้";
-
-  // กลุ่มเป็น label สวยๆ
-  state.subjects.forEach((s) => {
-    const opt = document.createElement("option");
-    opt.value = String(s.id);
-    const code = (s.subject_code || "").trim();
-    const name = (s.subject_name || "").trim();
-    const day = (s.day || "").trim();
-    const st = (s.start_time || "").trim();
-    const en = (s.end_time || "").trim();
-    opt.textContent = `${code} ${name} • ${day} ${st}-${en}`;
-    sel.appendChild(opt);
-  });
-
-  if (selectedSubjectId) {
-    sel.value = String(selectedSubjectId);
-  } else {
-    sel.value = String(state.subjects[0].id);
-  }
-
-  // set allowDow from selected
-  const picked = state.subjects.find((x) => String(x.id) === String(sel.value));
-  const dow = picked ? thaiDowIndexFromSubjectDay(picked.day) : null;
-  state.allowDow = dow;
-
-  // auto set cancel date if not exists
-  if (!state.cancelYmd) autoSelectNextValidCancelDate();
-  renderCalendar();
-}
-
-async function openEdit(row) {
+function openModal(row) {
   state.editing = row;
+  state.editingType = row.type || "cancel";
 
-  $("#mTitle").textContent = "แก้ไขรายการ";
-  $("#mSub").textContent = `#${row.id} • ${itemDateText(row)}`;
+  $("#mSub").textContent = `#${row.id} • ${row.type}`;
+  $("#mType").value = state.editingType;
 
-  // type
-  const mType = $("#mType");
-  mType.value = row.type;
-  setTypeUI(row.type);
+  $("#mTitleInput").value = row.title || "";
+  $("#mNote").value = row.note || "";
 
-  // title/note
-  $("#mTitleInput").value = (row.title || "");
-  $("#mNote").value = (row.note || "");
+  $("#cancelBox").hidden = true;
+  $("#holidayBox").hidden = true;
 
-  // holiday dates (ymd)
-  const sYmd = String(row.start_at || "").slice(0, 10);
-  const eYmd = String(row.end_at || "").slice(0, 10);
-
-  // cancel date = start_at ymd
-  state.cancelYmd = sYmd || null;
-
-  // set start/end input for holiday mode
-  $("#mStart").value = sYmd || "";
-  $("#mEnd").value = (eYmd && eYmd !== sYmd) ? eYmd : "";
-
-  // fill subjects for cancel
-  fillSubjectSelect(row.subject_id || "");
-
-  // bind subject change -> enforce dow + auto select
-  $("#mSubject").onchange = () => {
-    const picked = state.subjects.find((x) => String(x.id) === String($("#mSubject").value));
-    state.allowDow = picked ? thaiDowIndexFromSubjectDay(picked.day) : null;
-    autoSelectNextValidCancelDate();
-    renderCalendar();
-  };
-
-  // load reminders
   clearReminderUI();
-  try {
-    const rems = await fetchReminders(row.id);
-    if (rems.length) {
-      rems.forEach((r) => addReminderRow(r.remind_at));
-    }
-  } catch (e) {
-    // ไม่ให้พังทั้งหน้า
-    console.warn("load reminders failed", e);
-  }
 
-  // buttons
-  $("#mAddRem").onclick = () => {
-    addReminderRow(null);
-    toast("เพิ่มเวลาแจ้งเตือนแล้ว ✅", "ok");
+  $("#mType").onchange = () => {
+    state.editingType = $("#mType").value;
+    applyTypeUI();
   };
+
+  $("#mAddRem").onclick = () => addReminderRow(null);
 
   $("#mDelete").onclick = async () => {
-    if (!confirm(`ลบรายการ #${row.id} ใช่ไหม?`)) return;
+    if (!confirm("ยืนยันลบรายการนี้?")) return;
     try {
-      await deleteHoliday(row.id);
-      toast("ลบรายการเรียบร้อย ✅");
-      openModal(false);
+      await deleteHoliday(Number(state.editing.id));
+      toast("ลบแล้ว ✅");
+      closeModal();
       await loadList();
     } catch (e) {
       toast(`ลบไม่สำเร็จ: ${e.message}`, "err");
     }
   };
 
-  $("#mSaveBtn").onclick = async () => applyEditAndClose(true);
+  $("#mCloseX").onclick = closeModal;
+  $("#mCloseBtn").onclick = closeModal;
+  $("#mBackdrop").onclick = closeModal;
   $("#mCancelBtn").onclick = () => {
-    openModal(false);
+    closeModal();
     toast("ยกเลิกการแก้ไขแล้ว", "ok");
   };
-  $("#mCloseBtn").onclick = () => openModal(false);
-  $("#mCloseX").onclick = () => openModal(false);
-  $("#mBackdrop").onclick = () => openModal(false);
 
-  // type change
-  $("#mType").onchange = () => {
-    const t = $("#mType").value;
-    setTypeUI(t);
+  $("#mSaveBtn").onclick = saveModal;
 
-    // โหมดเปลี่ยนไปมา: จัดค่าที่จำเป็นให้พร้อม
-    if (t === "cancel") {
-      fillSubjectSelect($("#mSubject").value);
-      if (!state.cancelYmd) autoSelectNextValidCancelDate();
-      renderCalendar();
-    } else {
-      // holiday: ถ้า start ว่าง ให้ default วันนี้
-      if (!$("#mStart").value) $("#mStart").value = dateToYmdLocal(new Date());
+  applyTypeUI();
+
+  (async () => {
+    try {
+      const items = await fetchReminders(row.id);
+      if (items.length) items.forEach((r) => addReminderRow(r.remind_at));
+    } catch (e) {
+      console.warn("fetchReminders failed:", e);
     }
-  };
+  })();
 
-  // init flatpickr สำหรับ start/end (holiday) ให้เป็น date อย่างเดียว
-  if (window.flatpickr) {
-    if (!$("#mStart")._fpDate) {
-      $("#mStart")._fpDate = flatpickr("#mStart", {
-        dateFormat: "Y-m-d",
-        altInput: true,
-        altFormat: "d/m/Y",
-        allowInput: true,
-      });
-      $("#mStart")._fpDate.altInput.classList.add("input");
-    }
-    if (!$("#mEnd")._fpDate) {
-      $("#mEnd")._fpDate = flatpickr("#mEnd", {
-        dateFormat: "Y-m-d",
-        altInput: true,
-        altFormat: "d/m/Y",
-        allowInput: true,
-      });
-      $("#mEnd")._fpDate.altInput.classList.add("input");
-    }
-  }
-
-  openModal(true);
+  $("#modal").hidden = false;
 }
 
-async function applyEditAndClose(closeLiffAfter = false) {
-  const row = state.editing;
-  if (!row) return;
+function closeModal() {
+  $("#modal").hidden = true;
+  state.editing = null;
+}
 
-  const type = $("#mType").value;
+function applyTypeUI() {
+  const t = state.editingType;
 
-  const title = ($("#mTitleInput").value || "").trim() || null;
-  const note = ($("#mNote").value || "").trim() || null;
+  if (t === "cancel") {
+    $("#cancelBox").hidden = false;
+    $("#holidayBox").hidden = true;
 
-  let subject_id = null;
-  let start_at = null;
-  let end_at = null;
+    const sel = $("#mSubject");
+    sel.innerHTML = state.subjects.map((s) => `
+      <option value="${s.subject_code}">${s.subject_code} • ${s.subject_name} (${s.day} ${s.start_time}-${s.end_time})</option>
+    `).join("");
 
-  if (type === "cancel") {
-    subject_id = ($("#mSubject").value || "").trim() || null;
+    const currentSubject = state.editing?.subject_id || "";
+    if (currentSubject) sel.value = currentSubject;
 
-    if (!subject_id) {
-      toast("กรุณาเลือกวิชา", "err");
-      return;
-    }
-    if (!state.cancelYmd) {
-      toast("กรุณาเลือกวันที่ยกคลาส", "err");
-      return;
-    }
+    const picked = state.subjects.find((x) => x.subject_code === sel.value) || null;
+    state.allowDow = picked ? thaiDowIndexFromSubjectDay(picked.day) : null;
 
-    // cancel: วันเดียวทั้งวัน (00:00-23:59)
-    start_at = toIsoBangkokAllDayStart(state.cancelYmd);
-    end_at = toIsoBangkokAllDayEnd(state.cancelYmd);
+    $("#mSubjectHint").textContent = picked
+      ? `วันเรียน: ${picked.day} • เวลา: ${picked.start_time}-${picked.end_time} • ห้อง: ${picked.room}`
+      : "";
+
+    sel.onchange = () => {
+      const p = state.subjects.find((x) => x.subject_code === sel.value) || null;
+      state.allowDow = p ? thaiDowIndexFromSubjectDay(p.day) : null;
+      $("#mSubjectHint").textContent = p
+        ? `วันเรียน: ${p.day} • เวลา: ${p.start_time}-${p.end_time} • ห้อง: ${p.room}`
+        : "";
+      autoSelectNextValidCancelDate();
+      renderCalendar();
+    };
+
+    state.calMonth = startOfMonth(nowBangkok());
+    state.cancelYmd = (state.editing?.start_at ? String(state.editing.start_at).slice(0, 10) : null);
+    if (!state.cancelYmd) autoSelectNextValidCancelDate();
+
+    $("#mCancelHint").textContent = state.cancelYmd ? `เลือก: ${ymdToThai(state.cancelYmd)}` : "ยังไม่ได้เลือกวันที่";
+    renderCalendar();
   } else {
-    // holiday
-    const s = ($("#mStart").value || "").trim();
-    const e = ($("#mEnd").value || "").trim() || s;
+    $("#cancelBox").hidden = true;
+    $("#holidayBox").hidden = false;
 
-    if (!s) {
-      toast("กรุณาเลือกวันที่เริ่ม", "err");
-      return;
+    const s = state.editing?.start_at ? String(state.editing.start_at).slice(0, 10) : "";
+    const e = state.editing?.end_at ? String(state.editing.end_at).slice(0, 10) : "";
+
+    $("#mStart").value = s;
+    $("#mEnd").value = e;
+
+    if (window.flatpickr) {
+      flatpickr("#mStart", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", allowInput: true });
+      flatpickr("#mEnd", { dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", allowInput: true });
     }
-    start_at = toIsoBangkokAllDayStart(s);
-    end_at = toIsoBangkokAllDayEnd(e);
-    subject_id = null;
   }
+}
 
-  const payload = {
-    id: row.id,
-    subject_id,
-    start_at,
-    end_at,
-    title,
-    note,
-  };
+async function saveModal() {
+  if (!state.editing) return;
+  $("#mSaveBtn").disabled = true;
 
   try {
-    $("#mSaveBtn").disabled = true;
+    const id = Number(state.editing.id);
+    const type = state.editingType;
 
-    // 1) update holiday
+    const title = ($("#mTitleInput").value || "").trim();
+    const note = ($("#mNote").value || "").trim();
+
+    let payload = { id, type, title, note };
+
+    if (type === "cancel") {
+      const subject_id = $("#mSubject").value;
+      const ymd = state.cancelYmd;
+      if (!subject_id) throw new Error("กรุณาเลือกวิชา");
+      if (!ymd) throw new Error("กรุณาเลือกวันที่ยกคลาส");
+
+      payload.subject_id = subject_id;
+      payload.all_day = 0;
+      payload.start_at = toIsoBangkokAllDayStart(ymd);
+      payload.end_at = toIsoBangkokAllDayEnd(ymd);
+    } else {
+      const startYmd = ($("#mStart").value || "").trim();
+      const endYmd = ($("#mEnd").value || "").trim() || startYmd;
+      if (!startYmd) throw new Error("กรุณาเลือกวันที่เริ่ม");
+
+      payload.subject_id = null;
+      payload.all_day = 1;
+      payload.start_at = toIsoBangkokAllDayStart(startYmd);
+      payload.end_at = toIsoBangkokAllDayEnd(endYmd);
+    }
+
     await updateHoliday(payload);
 
-    // 2) set reminders (replace pending)
-    const remIso = collectReminderIsoList();
-    await setReminders(row.id, remIso);
+    const reminderIsoList = collectReminderIsoList();
+    await setReminders(id, reminderIsoList);
 
-    toast("บันทึกการแก้ไขเรียบร้อย ✅", "ok");
-
-    openModal(false);
+    toast("บันทึกแล้ว ✅");
+    closeModal();
     await loadList();
-
-    // 3) close LIFF (ถ้าเปิดใน LINE)
-    if (closeLiffAfter && window.liff && liff.isInClient()) {
-      liff.closeWindow();
-    }
   } catch (e) {
     toast(`บันทึกไม่สำเร็จ: ${e.message}`, "err");
   } finally {
@@ -747,7 +620,6 @@ async function applyEditAndClose(closeLiffAfter = false) {
 /* =========================
    Load & Init
    ========================= */
-
 async function loadList() {
   $("#status").textContent = "";
   $("#listHint").textContent = "กำลังโหลด...";
@@ -771,7 +643,12 @@ async function loadList() {
 async function init() {
   try {
     if (!window.liff) throw new Error("LIFF SDK not loaded");
-    if (!LIFF_ID) throw new Error('liffId is necessary for liff.init() — ใส่ window.__LIFF_ID__ ใน index.html');
+    if (!LIFF_ID) throw new Error('liffId is necessary for liff.init()');
+
+    if (!API_BASE) {
+      toast("ยังไม่ได้ตั้งค่า API_BASE (window.__API_BASE__) ❗", "err");
+      console.warn("Missing API_BASE.");
+    }
 
     await liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true });
 
@@ -780,7 +657,14 @@ async function init() {
       return;
     }
 
-    state.idToken = liff.getIDToken();
+    // ✅ ใช้ access token เป็นหลัก
+    state.token = liff.getAccessToken() || "";
+    state.idToken = liff.getIDToken() || "";
+
+    if (!state.token) {
+      toast("ไม่พบ Access Token ❗ (ลองปิดแล้วเปิด LIFF ใหม่)", "err");
+      console.warn("Missing access token.");
+    }
 
     try {
       state.profile = await liff.getProfile();
@@ -789,25 +673,14 @@ async function init() {
       $("#userPill").textContent = "LINE User";
     }
 
-    // load subjects first (needed for cancel)
     state.subjects = await fetchSubjects();
 
-    // calendar controls
-    $("#calPrev").onclick = () => {
-      state.calMonth = addMonths(state.calMonth, -1);
-      renderCalendar();
-    };
-    $("#calNext").onclick = () => {
-      state.calMonth = addMonths(state.calMonth, +1);
-      renderCalendar();
-    };
+    $("#calPrev").onclick = () => { state.calMonth = addMonths(state.calMonth, -1); renderCalendar(); };
+    $("#calNext").onclick = () => { state.calMonth = addMonths(state.calMonth, +1); renderCalendar(); };
 
-    // top actions
     $("#reloadBtn").onclick = () => loadList();
-
-    // ปุ่มพวก “ทั้งการแก้ไข / บันทึกทั้งหมด” (ยังไม่ทำ batch UI — กันคนงงก่อน)
-    $("#editAllBtn").onclick = () => toast("โหมดนี้ยังไม่เปิดใช้งาน (กันพลาด) 😉", "ok");
-    $("#saveAllBtn").onclick = () => toast("โหมดนี้ยังไม่เปิดใช้งาน (กันพลาด) 😉", "ok");
+    $("#editAllBtn").onclick = () => toast("โหมดนี้ยังไม่เปิดใช้งาน 😉", "ok");
+    $("#saveAllBtn").onclick = () => toast("โหมดนี้ยังไม่เปิดใช้งาน 😉", "ok");
 
     await loadList();
   } catch (e) {
