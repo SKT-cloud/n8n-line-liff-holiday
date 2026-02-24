@@ -1,5 +1,3 @@
-import { CONFIG } from "./config.js";
-
 const dayOrder = ["จันทร์","อังคาร","พุธ","พฤหัสบดี","พฤ","ศุกร์","เสาร์","อาทิตย์"];
 
 function dayRank(d){
@@ -20,28 +18,68 @@ function fmtTime(t){
 }
 
 function isoAtStartOfDay(dateStr){
-  // YYYY-MM-DD -> ISO +07:00 start
   return `${dateStr}T00:00:00+07:00`;
 }
 function isoAtEndOfDay(dateStr){
   return `${dateStr}T23:59:59+07:00`;
 }
 
+function digits2(v){
+  return String(v ?? "").replace(/\D/g, "").slice(0, 2);
+}
+
+function wireTimeAutoJump(hhEl, mmEl) {
+  if (!hhEl || !mmEl) return;
+
+  hhEl.setAttribute("inputmode", "numeric");
+  hhEl.setAttribute("maxlength", "2");
+  mmEl.setAttribute("inputmode", "numeric");
+  mmEl.setAttribute("maxlength", "2");
+
+  hhEl.addEventListener("input", () => {
+    hhEl.value = digits2(hhEl.value);
+    if (hhEl.value.length === 2) {
+      mmEl.focus();
+      mmEl.select?.();
+    }
+  });
+
+  mmEl.addEventListener("input", () => {
+    mmEl.value = digits2(mmEl.value);
+  });
+
+  mmEl.addEventListener("keydown", (e) => {
+    if (e.key === "Backspace" && (mmEl.value || "").length === 0) {
+      hhEl.focus();
+      hhEl.select?.();
+    }
+  });
+
+  // blur แล้วค่อย pad เป็น 2 หลัก (ถ้ามีค่า)
+  const pad2 = (el, max) => {
+    if (!el.value) return;
+    let n = Number(el.value);
+    if (!Number.isFinite(n)) { el.value = ""; return; }
+    n = Math.max(0, Math.min(max, n));
+    el.value = String(n).padStart(2, "0");
+  };
+  hhEl.addEventListener("blur", () => pad2(hhEl, 23));
+  mmEl.addEventListener("blur", () => pad2(mmEl, 59));
+}
+
 export function initForm({ el, mode, profile, subjects, onSubmit }) {
   const $ = (id) => el.querySelector(id);
 
-  // Header
+  // Header (ไม่โชว์ badge แล้วใน html, เลยไม่ต้อง set text)
   $("#profileName").textContent = profile?.displayName || "";
-  $("#badge").textContent = mode === "edit" ? "Edit" : "Add";
 
-  // State
   const state = {
-    type: "holiday", // holiday | cancel
-    subjectKey: null, // string id
-    reminders: [], // {date,time}
+    type: "holiday",      // holiday | cancel
+    subjectKey: null,     // string key
+    reminders: [],        // {date, hh, mm}
   };
 
-  // Build subject list (for cancel)
+  // ===== Subjects (for cancel) =====
   const grouped = new Map();
   for (const s of subjects) {
     const day = s.day || "";
@@ -63,6 +101,7 @@ export function initForm({ el, mode, profile, subjects, onSubmit }) {
       return `
         <button class="subCard" type="button" data-key="${escapeHtml(key)}"
           data-payload='${escapeHtml(JSON.stringify({
+            id: s.id,
             subject_code: s.subject_code,
             section: s.section,
             type: s.type,
@@ -87,10 +126,11 @@ export function initForm({ el, mode, profile, subjects, onSubmit }) {
     `;
   }).join("");
 
-  // Toggle type
+  // ===== Toggle type =====
   const btnHoliday = $("#btnTypeHoliday");
   const btnCancel = $("#btnTypeCancel");
   const cancelBox = $("#cancelBox");
+
   function renderType(){
     btnHoliday.classList.toggle("isActive", state.type === "holiday");
     btnCancel.classList.toggle("isActive", state.type === "cancel");
@@ -100,7 +140,7 @@ export function initForm({ el, mode, profile, subjects, onSubmit }) {
   btnCancel.addEventListener("click", () => { state.type = "cancel"; renderType(); });
   renderType();
 
-  // Subject selection highlight
+  // ===== Subject selection =====
   function clearSelected(){
     el.querySelectorAll(".subCard.isSelected").forEach(b => b.classList.remove("isSelected"));
   }
@@ -110,10 +150,12 @@ export function initForm({ el, mode, profile, subjects, onSubmit }) {
     clearSelected();
     btn.classList.add("isSelected");
     state.subjectKey = btn.dataset.key;
-    $("#selectedSubject").textContent = btn.querySelector(".subBot")?.textContent || "";
+
+    const payload = JSON.parse(btn.dataset.payload);
+    $("#selectedSubject").textContent = `${payload.subject_code || ""} ${payload.subject_name || ""}`.trim();
   });
 
-  // Reminders
+  // ===== Reminders UI =====
   const remList = $("#remindersList");
   const addRemBtn = $("#addReminder");
 
@@ -122,10 +164,12 @@ export function initForm({ el, mode, profile, subjects, onSubmit }) {
       remList.innerHTML = `<div class="hint">ยังไม่มีการตั้งแจ้งเตือน</div>`;
       return;
     }
+
     remList.innerHTML = state.reminders.map((r, idx) => {
       const safeD = escapeHtml(r.date || "");
-      const safeH = escapeHtml((r.time||"09:00").slice(0,2));
-      const safeM = escapeHtml((r.time||"09:00").slice(3,5));
+      const safeH = escapeHtml(r.hh || "");
+      const safeM = escapeHtml(r.mm || "");
+
       return `
         <div class="remRow" data-idx="${idx}">
           <div class="remNo">#${idx+1}</div>
@@ -134,12 +178,13 @@ export function initForm({ el, mode, profile, subjects, onSubmit }) {
               <span>วันที่</span>
               <input class="input" type="date" value="${safeD}" data-k="date" />
             </label>
+
             <label class="field">
               <span>เวลา</span>
               <div class="timeRow">
-                <input class="input time" type="number" min="0" max="23" value="${safeH}" data-k="hh" />
+                <input class="input time" type="text" placeholder="HH" value="${safeH}" data-k="hh" inputmode="numeric" maxlength="2" />
                 <span class="timeSep">:</span>
-                <input class="input time" type="number" min="0" max="59" value="${safeM}" data-k="mm" />
+                <input class="input time" type="text" placeholder="MM" value="${safeM}" data-k="mm" inputmode="numeric" maxlength="2" />
               </div>
             </label>
           </div>
@@ -147,10 +192,18 @@ export function initForm({ el, mode, profile, subjects, onSubmit }) {
         </div>
       `;
     }).join("");
+
+    // ✅ หลัง render เสร็จ ค่อย wire auto-jump ให้ทุกแถว
+    remList.querySelectorAll(".remRow").forEach((row) => {
+      const hh = row.querySelector('[data-k="hh"]');
+      const mm = row.querySelector('[data-k="mm"]');
+      wireTimeAutoJump(hh, mm);
+    });
   }
 
   addRemBtn.addEventListener("click", () => {
-    state.reminders.push({ date: "", time: "09:00" });
+    // ✅ เริ่มเป็นค่าว่างทั้งหมด
+    state.reminders.push({ date: "", hh: "", mm: "" });
     renderReminders();
   });
 
@@ -158,6 +211,7 @@ export function initForm({ el, mode, profile, subjects, onSubmit }) {
     const row = e.target.closest(".remRow");
     if (!row) return;
     const idx = Number(row.dataset.idx);
+
     if (e.target?.dataset?.act === "del") {
       state.reminders.splice(idx, 1);
       renderReminders();
@@ -169,23 +223,30 @@ export function initForm({ el, mode, profile, subjects, onSubmit }) {
     if (!row) return;
     const idx = Number(row.dataset.idx);
     const k = e.target.dataset.k;
+
     if (k === "date") {
       state.reminders[idx].date = e.target.value;
+      return;
     }
-    if (k === "hh" || k === "mm") {
-      const hh = row.querySelector('[data-k="hh"]').value;
-      const mm = row.querySelector('[data-k="mm"]').value;
-      const HH = String(Math.max(0, Math.min(23, Number(hh)||0))).padStart(2,"0");
-      const MM = String(Math.max(0, Math.min(59, Number(mm)||0))).padStart(2,"0");
-      state.reminders[idx].time = `${HH}:${MM}`;
-      row.querySelector('[data-k="hh"]').value = HH;
-      row.querySelector('[data-k="mm"]').value = MM;
+
+    if (k === "hh") {
+      const v = digits2(e.target.value);
+      state.reminders[idx].hh = v;
+      e.target.value = v;
+      return;
+    }
+
+    if (k === "mm") {
+      const v = digits2(e.target.value);
+      state.reminders[idx].mm = v;
+      e.target.value = v;
+      return;
     }
   });
 
   renderReminders();
 
-  // Actions
+  // ===== Reset =====
   $("#resetBtn").addEventListener("click", () => {
     $("#title").value = "";
     $("#note").value = "";
@@ -194,12 +255,13 @@ export function initForm({ el, mode, profile, subjects, onSubmit }) {
     state.type = "holiday";
     state.subjectKey = null;
     state.reminders = [];
-    $("#selectedSubject").textContent = "";
+    $("#selectedSubject").textContent = "-";
     clearSelected();
     renderType();
     renderReminders();
   });
 
+  // ===== Submit =====
   el.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -211,27 +273,32 @@ export function initForm({ el, mode, profile, subjects, onSubmit }) {
     if (!start) throw new Error("กรุณาเลือกวันเริ่ม");
     if (state.type === "cancel" && !state.subjectKey) throw new Error("กรุณาเลือกวิชา");
 
-    // Subject payload (optional)
+    // Subject payload
     let subject = null;
     if (state.type === "cancel") {
       const selected = el.querySelector(".subCard.isSelected");
       if (selected) subject = JSON.parse(selected.dataset.payload);
     }
 
-    // Reminders -> worker accepts array of ISO strings OR {days_before,time} OR {remind_at}
-    // เราเลือกส่งเป็น ISO string ตาม date+time ที่ user กำหนด
+    // ✅ reminder time ต้องครบ HH+MM (2 หลัก) ถึงจะส่ง
     const reminders = state.reminders
-      .filter(r => r.date && r.time)
-      .map(r => `${r.date}T${r.time}:00+07:00`);
+      .filter(r => r.date && r.hh?.length === 2 && r.mm?.length === 2)
+      .map(r => `${r.date}T${r.hh}:${r.mm}:00+07:00`);
 
     const payload = {
       type: state.type,
-      title: title || null,
-      note: note || null,
+      subject_id: state.type === "cancel" ? (subject?.id ?? null) : null,
+
+      // ✅ ตามแนวคิดคุณ: holiday=ทั้งวัน, cancel=ไม่ใช่ทั้งวัน
+      all_day: state.type === "holiday" ? 1 : 0,
+
       start_at: isoAtStartOfDay(start),
       end_at: isoAtEndOfDay(end),
-      all_day: 1,
-      subject: subject,
+
+      // ✅ title สำหรับ cancel ถ้าไม่กรอก ให้เป็น "รหัสวิชา ชื่อวิชา"
+      title: title ? title : (state.type === "cancel" ? `${subject?.subject_code || ""} ${subject?.subject_name || ""}`.trim() : null),
+
+      note: note || null,
       reminders,
     };
 

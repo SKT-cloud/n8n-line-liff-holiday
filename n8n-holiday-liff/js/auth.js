@@ -6,15 +6,26 @@ export async function initLiff() {
   const liffId = CONFIG.getLiffId();
   await window.liff.init({ liffId });
 
+  // ยังไม่ login → login แล้ว redirect
   if (!window.liff.isLoggedIn()) {
     window.liff.login();
-    return;
+    return null;
   }
 
-  // ID Token (ใช้ verify ใน Worker)
+  // มี login แล้ว แต่ token อาจหมด
   const idToken = window.liff.getIDToken();
-  if (!idToken) throw new Error("missing idToken (getIDToken)");
+  if (!idToken) {
+    window.liff.login();
+    return null;
+  }
 
-  const profile = await window.liff.getProfile();
-  return { idToken, profile };
+  // ลองดึง profile ถ้า fail มักเป็น token/สถานะหลุด → login ใหม่
+  try {
+    const profile = await window.liff.getProfile();
+    return { idToken, profile };
+  } catch (e) {
+    console.warn("LIFF getProfile failed -> re-login", e);
+    window.liff.login();
+    return null;
+  }
 }

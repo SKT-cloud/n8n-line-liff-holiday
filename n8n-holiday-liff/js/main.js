@@ -1,9 +1,19 @@
-import { initLiff } from "./auth.js";
-import { fetchSubjects, createHoliday } from "./api.js";
-import { CONFIG } from "./config.js";
-import { initForm } from "./form.js";
+import { CONFIG } from "./config.js?v=20260224_01";
+import { initLiff } from "./auth.js?v=20260224_01";
+import { fetchSubjects, createHoliday } from "./api.js?v=20260224_01";
+import { initForm } from "./form.js?v=20260224_01";
 
 const $ = (s) => document.querySelector(s);
+
+function toast(msg, kind = "info") {
+  const el = $("#toast");
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `toast ${kind}`;
+  el.hidden = false;
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => (el.hidden = true), 2800);
+}
 
 function setStatus(text) {
   const el = $("#status");
@@ -11,18 +21,41 @@ function setStatus(text) {
   el.textContent = text || "";
 }
 
-function toast(msg, kind = "info") {
-  const el = $("#toast");
-  if (!el) return;
-  el.hidden = false;
-  el.textContent = msg;
+function ymdToDDMMYYYY(ymd) {
+  if (!ymd) return "-";
+  const [y, m, d] = String(ymd).split("-");
+  if (!y || !m || !d) return "-";
+  return `${d}/${m}/${y}`;
+}
 
-  // style by kind (เบา ๆ)
-  el.style.borderColor = kind === "err" ? "rgba(239,68,68,.28)" : "rgba(15,23,42,.10)";
-  el.style.background = kind === "err" ? "rgba(254,242,242,.92)" : "rgba(255,255,255,.94)";
+function buildConfirmText(payload) {
+  const typeText = payload.type === "cancel" ? "ยกคลาส" : "หยุดทั้งวัน";
 
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => (el.hidden = true), 2600);
+  const s = (payload.start_at || "").slice(0, 10);
+  const e = (payload.end_at || "").slice(0, 10);
+  const dateText =
+    s && e ? (s === e ? ymdToDDMMYYYY(s) : `${ymdToDDMMYYYY(s)} – ${ymdToDDMMYYYY(e)}`) : "-";
+
+  const remindCount = Array.isArray(payload.reminders) ? payload.reminders.length : 0;
+
+  return [
+    "ยืนยันการบันทึกใช่ไหม?",
+    "",
+    `ประเภท: ${typeText}`,
+    `วันที่: ${dateText}`,
+    `หัวข้อ: ${payload.title || "-"}`,
+    `แจ้งเตือน: ${remindCount ? `${remindCount} เวลา` : "ไม่แจ้งเตือน"}`,
+  ].join("\n");
+}
+
+async function closeLiffSafely() {
+  try {
+    if (window.liff?.isInClient?.() === true) {
+      window.liff.closeWindow();
+      return true;
+    }
+  } catch {}
+  return false;
 }
 
 async function run() {
@@ -30,61 +63,59 @@ async function run() {
     setStatus("กำลังเปิดฟอร์ม…");
 
     const session = await initLiff();
-    if (!session) return; // login redirect
+    if (!session) return; // login redirected
     const { idToken, profile } = session;
 
-    // Show profile name
-    const profileEl = $("#profileName");
-    if (profileEl) profileEl.textContent = profile?.displayName || "ผู้ใช้";
+    // top-right user pill
+    const pill = $("#profileName");
+    if (pill) pill.textContent = profile?.displayName || "ผู้ใช้";
 
-    // Mode badge
-    const badge = $("#badge");
-    if (badge) badge.textContent = CONFIG.getMode() === "edit" ? "Edit" : "Add";
+    // preview date format
+    const startDate = $("#startDate");
+    const endDate = $("#endDate");
+    const startPreview = $("#startPreview");
+    const endPreview = $("#endPreview");
+    const updatePreview = () => {
+      if (startPreview) startPreview.textContent = startDate?.value ? ymdToDDMMYYYY(startDate.value) : "-";
+      if (endPreview) endPreview.textContent = endDate?.value ? ymdToDDMMYYYY(endDate.value) : "-";
+    };
+    startDate?.addEventListener("change", updatePreview);
+    endDate?.addEventListener("change", updatePreview);
+    updatePreview();
 
-    // Load subjects
+    // load subjects
+    setStatus("กำลังโหลดตารางวิชา…");
+    const items = await fetchSubjects({ idToken });
     const subjectsStatus = $("#subjectsStatus");
-    if (subjectsStatus) subjectsStatus.textContent = "กำลังโหลดรายวิชา…";
-
-    const subjects = await fetchSubjects({ idToken });
-
-    if (subjectsStatus) {
-      subjectsStatus.textContent = subjects.length ? `มี ${subjects.length} รายวิชา` : "ยังไม่มีรายวิชาในระบบ";
-    }
+    if (subjectsStatus) subjectsStatus.textContent = items.length ? `มี ${items.length} รายวิชา` : "ยังไม่มีรายวิชาในระบบ";
 
     setStatus("");
 
-    // Mount initForm (ใช้ UI + logic ที่คุณทำไว้ใน form.js)
+    // init form handler
     initForm({
       el: document,
       mode: CONFIG.getMode(),
       profile,
-      subjects,
-
+      subjects: items,
       onSubmit: async (payload) => {
+        // ✅ confirm
+        const ok = window.confirm(buildConfirmText(payload));
+        if (!ok) {
+          toast("ยกเลิกแล้ว 👌", "info");
+          return;
+        }
+
         try {
           setStatus("กำลังบันทึก…");
+          toast("กำลังบันทึก…", "info");
 
-          // form.js ส่ง subject เป็น object (ถ้าเป็น cancel)
-          // แต่ Worker ต้องการ subject_id
-          const subject_id = payload?.subject ? (payload.subject.id ?? null) : null;
-
-          const finalPayload = {
-            type: payload.type,
-            title: payload.title,
-            note: payload.note,
-            start_at: payload.start_at,
-            end_at: payload.end_at,
-            all_day: payload.all_day ?? 1,
-            subject_id,
-            reminders: payload.reminders || [],
-          };
-
-          await createHoliday({ idToken, payload: finalPayload });
+          await createHoliday({ idToken, payload });
 
           setStatus("");
           toast("บันทึกสำเร็จ ✅", "ok");
 
-          try { window.liff.closeWindow(); } catch (_) {}
+          // ปิด LIFF อัตโนมัติ (ถ้าเปิดใน LINE)
+          setTimeout(() => closeLiffSafely(), 650);
         } catch (e) {
           console.error(e);
           setStatus("");
@@ -92,7 +123,6 @@ async function run() {
         }
       },
     });
-
   } catch (e) {
     console.error(e);
     setStatus("");

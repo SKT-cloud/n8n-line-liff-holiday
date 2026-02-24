@@ -1,5 +1,7 @@
 import { CONFIG, joinUrl } from "./config.js";
 
+export const API_VERSION = "20260224_01";
+
 async function requestJson(path, { method = "GET", idToken, body } = {}) {
   const url = joinUrl(CONFIG.WORKER_BASE, path);
 
@@ -25,6 +27,7 @@ export async function fetchSubjects({ idToken }) {
   return data.items || [];
 }
 
+// ✅ export นี้ต้องมีแน่ๆ ไม่งั้น main.js import พัง
 export async function createHoliday({ idToken, payload }) {
   return requestJson("/liff/holidays/create", { method: "POST", idToken, body: payload });
 }

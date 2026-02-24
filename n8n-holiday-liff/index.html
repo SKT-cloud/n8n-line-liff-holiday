@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>StudyBot • เพิ่มวันหยุด / ยกคลาส</title>
+  <title>StudyBot • เพิ่มวันหยุด</title>
 
   <link rel="stylesheet" href="/css/style.css" />
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -13,7 +13,6 @@
   <div class="bg" aria-hidden="true"></div>
 
   <main class="wrap">
-    <!-- Top -->
     <header class="topbar">
       <div class="brand">
         <div class="h1">เพิ่มวันหยุด</div>
@@ -21,57 +20,52 @@
       </div>
 
       <div class="chips">
-        <div class="chip" id="badge">Add</div>
+        <!-- ซ่อน Add/Badge -->
+        <div class="chip chipMode" id="badge" hidden></div>
         <div class="chip" id="profileName">กำลังเชื่อมต่อ…</div>
       </div>
     </header>
 
-    <!-- Card -->
     <section class="card">
-      <!-- Status line (optional, กัน error) -->
       <div id="status" class="status" aria-live="polite"></div>
 
-      <!-- FORM (สำคัญ: form.js ฟัง submit ที่ element นี้) -->
       <form id="holidayForm" class="grid">
-        <!-- Type Segmented -->
         <div class="field">
           <div class="label">ประเภท</div>
           <div class="seg">
             <button id="btnTypeHoliday" class="segBtn isActive" type="button">หยุดทั้งวัน</button>
             <button id="btnTypeCancel" class="segBtn" type="button">ยกคลาส</button>
           </div>
-          <div class="help">ถ้าเลือก “ยกคลาส” ต้องเลือกวิชาจากด้านล่าง</div>
+          <div class="help">ถ้าเลือก “ยกคลาส” ต้องเลือกวิชาจากตารางด้านล่าง</div>
         </div>
 
-        <!-- Title -->
         <div class="field">
           <label class="label" for="title">หัวข้อ <span class="muted">(ไม่จำเป็น)</span></label>
           <input id="title" type="text" placeholder="เช่น ไปอบรม / ป่วย" maxlength="120" />
         </div>
 
-        <!-- Note -->
         <div class="field">
           <label class="label" for="note">หมายเหตุ <span class="muted">(ไม่จำเป็น)</span></label>
           <textarea id="note" rows="3" placeholder="เช่น สถานที่ / เหตุผล / รายละเอียดเพิ่มเติม" maxlength="500"></textarea>
         </div>
 
-        <!-- Date -->
         <div class="field">
           <div class="label">ช่วงวันที่หยุด</div>
           <div class="row2">
             <div class="field">
               <label class="mini" for="startDate">วันเริ่ม</label>
               <input id="startDate" type="date" />
+              <div class="hint" id="startPreview">-</div>
             </div>
             <div class="field">
               <label class="mini" for="endDate">วันสุดท้าย (เว้นได้)</label>
               <input id="endDate" type="date" />
+              <div class="hint" id="endPreview">-</div>
             </div>
           </div>
           <div class="help">ถ้าหยุดวันเดียว ปล่อย “วันสุดท้าย” ว่างได้ ✅</div>
         </div>
 
-        <!-- Reminders -->
         <div class="sectionHead">
           <div>
             <div class="h2">แจ้งเตือน</div>
@@ -82,7 +76,6 @@
 
         <div id="remindersList" class="remBox"></div>
 
-        <!-- Cancel section -->
         <div id="cancelBox" class="cancelBox" hidden>
           <div class="sectionHead">
             <div>
@@ -98,20 +91,19 @@
           <div id="subjectList" class="subjectList"></div>
         </div>
 
-        <!-- Actions -->
         <div class="actions">
           <button id="resetBtn" class="btn" type="button">ล้างฟอร์ม</button>
           <button class="btn primary" type="submit">บันทึก</button>
         </div>
       </form>
 
-      <!-- Toast -->
       <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     </section>
 
     <footer class="foot">StudyBot • LIFF</footer>
   </main>
 
-  <script type="module" src="/js/main.js"></script>
+  <!-- ✅ cache-bust -->
+  <script type="module" src="/js/main.js?v=20260224_01"></script>
 </body>
 </html>
