@@ -5,11 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>แก้ไข / ลบวันหยุด • StudyBot</title>
 
+  <!-- ✅ ตั้งค่า LIFF ID (ใส่ของคุณเอง) -->
+  <script>
+    // ใส่ LIFF ID ของหน้า "แก้ไข/ลบวันหยุด" (เช่น 200xxxxxxxxx-xxxxxxxx)
+    window.__LIFF_ID__ = "2009146879-3eBGpF5j";
+  </script>
+
   <link rel="stylesheet" href="./style.css" />
 
   <!-- ✅ Flatpickr (เวลา 24h + UX กดง่าย) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+  <!-- ✅ LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <!-- ✅ Flatpickr JS -->
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
   <script defer src="./script.js"></script>
@@ -36,93 +46,93 @@
 
         <div class="toolbar">
           <button class="btnGhost" id="reloadBtn" type="button">รีเฟรช</button>
+          <button class="btnGhost" id="editAllBtn" type="button">ทั้งการแก้ไข</button>
+          <button class="btnPrimary" id="saveAllBtn" type="button">บันทึกทั้งหมด</button>
         </div>
       </div>
 
       <div id="list" class="list"></div>
-
       <div class="status" id="status"></div>
-
-      <div class="actions">
-        <button type="button" class="btnGhost" id="discardBtn">ทิ้งการแก้ไข</button>
-        <button type="button" class="btnPrimary" id="saveAllBtn">บันทึกทั้งหมด</button>
-      </div>
     </section>
 
     <div class="footer">StudyBot • LIFF</div>
   </main>
 
-  <!-- ✅ Modal -->
+  <!-- =========================
+       Modal (Edit)
+  ========================= -->
   <div class="modal" id="modal" hidden>
-    <div class="modalBackdrop" data-close="1"></div>
+    <div class="modalBackdrop" id="mBackdrop"></div>
 
-    <div class="modalSheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modalSheet" role="dialog" aria-modal="true" aria-labelledby="mTitle">
       <div class="modalTop">
         <div>
-          <div class="modalTitle" id="modalTitle">แก้ไขรายการ</div>
-          <div class="modalSub" id="modalSub">—</div>
+          <div class="modalTitle" id="mTitle">แก้ไขรายการ</div>
+          <div class="modalSub" id="mSub">#- • -</div>
         </div>
-        <button class="iconBtn" type="button" data-close="1" aria-label="ปิด">✕</button>
+        <button class="iconBtn" id="mCloseX" type="button">✕</button>
       </div>
 
       <div class="modalBody">
-        <!-- ✅ ประเภท: เปลี่ยนได้ -->
         <div class="row">
           <div class="label">ประเภท</div>
-          <select class="input" id="mType">
+          <select id="mType" class="input">
             <option value="cancel">🚫 ยกคลาส</option>
             <option value="holiday">🏝️ หยุดทั้งวัน</option>
           </select>
-          <div class="help" id="typeHint">—</div>
-        </div>
-
-        <!-- ✅ โหมด cancel: เลือกวิชา -->
-        <div class="row" id="subjectWrap" hidden>
-          <div class="label">วิชา (สำหรับยกคลาส)</div>
-          <select class="input" id="mSubject">
-            <option value="">กำลังโหลด...</option>
-          </select>
-          <div class="help" id="subjectHint"></div>
-        </div>
-
-        <!-- ✅ โหมด cancel: วันที่ยกคลาส (บังคับตามวันเรียนของวิชา) -->
-        <div class="row" id="cancelDateWrap" hidden>
-          <div class="label">วันที่ยกคลาส</div>
-          <div class="pill" id="cancelDatePill">ยังไม่ได้เลือก</div>
-          <input type="hidden" id="mCancelYmd" />
-          <div class="help" id="cancelHint">เลือกได้เฉพาะวันเรียนของวิชาที่เลือกเท่านั้น</div>
-
-          <div class="calWrap" id="calWrap">
-            <div class="calTop">
-              <button class="btnGhost calBtn" id="calPrev" type="button">‹</button>
-              <div class="calTitle" id="calTitle">—</div>
-              <button class="btnGhost calBtn" id="calNext" type="button">›</button>
-            </div>
-            <div class="calGrid" id="calGrid"></div>
-          </div>
-        </div>
-
-        <!-- ✅ โหมด holiday: วันที่เริ่ม/สิ้นสุด -->
-        <div class="row" id="holidayDatesWrap">
-          <div class="label">วันที่เริ่ม</div>
-          <input class="input" type="date" id="mStart" />
-        </div>
-
-        <div class="row" id="endWrap">
-          <div class="label">วันที่สิ้นสุด (เว้นได้ = วันเดียว)</div>
-          <input class="input" type="date" id="mEnd" />
         </div>
 
         <div class="row">
           <div class="label">หัวข้อ (ปล่อยว่างได้)</div>
-          <input class="input" id="mTitle" placeholder="เช่น ป่วย / ไปอบรม" />
+          <input id="mTitleInput" class="input" placeholder="หัวข้อ..." />
         </div>
 
         <div class="row">
           <div class="label">หมายเหตุ (optional)</div>
-          <textarea class="input" id="mNote" placeholder="รายละเอียดเพิ่มเติม..."></textarea>
+          <textarea id="mNote" class="input" placeholder="รายละเอียดเพิ่มเติม..."></textarea>
         </div>
 
+        <!-- ✅ CANCEL: subject + calendar -->
+        <div id="cancelBox" hidden>
+          <div class="row">
+            <div class="label">เลือกวิชา</div>
+            <select id="mSubject" class="input"></select>
+            <div class="help" id="mSubjectHint"></div>
+          </div>
+
+          <div class="row">
+            <div class="label">วันที่ยกคลาส</div>
+            <div class="help">เลือกได้เฉพาะวันที่ตรงกับวันเรียนของวิชานี้</div>
+
+            <div class="calWrap" id="calWrap">
+              <div class="calTop">
+                <div class="calTitle" id="calTitle">-</div>
+                <div class="toolbar">
+                  <button class="btnGhost calBtn" id="calPrev" type="button">‹</button>
+                  <button class="btnGhost calBtn" id="calNext" type="button">›</button>
+                </div>
+              </div>
+
+              <div class="calGrid" id="calGrid"></div>
+            </div>
+
+            <div class="help" id="mCancelHint"></div>
+          </div>
+        </div>
+
+        <!-- ✅ HOLIDAY: start/end -->
+        <div id="holidayBox" hidden>
+          <div class="row">
+            <div class="label">วันที่เริ่ม</div>
+            <input id="mStart" class="input" placeholder="YYYY-MM-DD" />
+          </div>
+          <div class="row">
+            <div class="label">วันที่สิ้นสุด (เว้นได้ = วันเดียว)</div>
+            <input id="mEnd" class="input" placeholder="YYYY-MM-DD" />
+          </div>
+        </div>
+
+        <!-- ✅ Reminders -->
         <div class="row">
           <div class="rowHead">
             <div>
@@ -135,25 +145,26 @@
           <div id="mRemList"></div>
         </div>
 
+        <!-- ✅ Danger -->
         <div class="row">
           <div class="dangerZone">
             <div>
               <div class="label">ลบรายการนี้</div>
               <div class="help">ลบแล้วจะหายจากระบบทันที</div>
             </div>
-            <button type="button" class="btnDanger" id="mDelete">ลบรายการนี้</button>
+            <button class="btnDanger" id="mDelete" type="button">ลบรายการนี้</button>
           </div>
         </div>
       </div>
 
       <div class="modalFoot">
-        <button type="button" class="btnGhost" id="mCancelEdit">ยกเลิกการแก้ไข</button>
-        <button type="button" class="btnGhost" data-close="1">ปิด</button>
-        <button type="button" class="btnPrimary" id="mApply">บันทึกการแก้ไขรายการนี้</button>
+        <button class="btnGhost" id="mCancelBtn" type="button">ยกเลิกการแก้ไขรายการนี้</button>
+        <button class="btnGhost" id="mCloseBtn" type="button">ปิด</button>
+        <button class="btnPrimary" id="mSaveBtn" type="button">บันทึกการแก้ไขรายการนี้</button>
       </div>
     </div>
   </div>
 
-  <div id="toast" class="toast" hidden></div>
+  <div class="toast" id="toast" hidden></div>
 </body>
 </html>

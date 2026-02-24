@@ -44,6 +44,17 @@ function toInt(v, def = 0) {
 // keep output timezone consistent with your app
 const TZ = "+07:00";
 
+/** Expand date-only range (YYYY-MM-DD) to full ISO with time in +07:00
+ * - from: YYYY-MM-DD -> YYYY-MM-DDT00:00:00+07:00
+ * - to  : YYYY-MM-DD -> YYYY-MM-DDT23:59:59+07:00
+ */
+function normalizeRangeIso(from, to) {
+  const f = (typeof from === "string" && from.length === 10) ? `${from}T00:00:00${TZ}` : from;
+  const t = (typeof to === "string" && to.length === 10) ? `${to}T23:59:59${TZ}` : to;
+  return { from: f, to: t };
+}
+
+
 /* =========================
    ✅ CORS (สำหรับ LIFF)
    ========================= */
@@ -398,73 +409,6 @@ function buildSavedFlex({ type, title, start_at, end_at }) {
   };
 }
 
-/**
- * ✅ Flex ยืนยันการ "แก้ไข" (ตอน update สำเร็จ)
- * - สุภาพ น่ารัก และมีปุ่ม "ดูวันหยุด"
- */
-function buildUpdatedFlex({ type, title, start_at, end_at, id }) {
-  const startYmd = (start_at || "").slice(0, 10);
-  const endYmd = (end_at || "").slice(0, 10);
-
-  const dateText =
-    startYmd
-      ? (endYmd && endYmd !== startYmd
-          ? `${ymdToThai(startYmd)} – ${ymdToThai(endYmd)}`
-          : `${ymdToThai(startYmd)}`)
-      : "-";
-
-  const typeText = type === "cancel" ? "🚫 ยกคลาส" : "📌 วันหยุด";
-  const t = title && String(title).trim()
-    ? String(title).trim()
-    : (type === "cancel" ? "ยกคลาส" : "วันหยุด");
-
-  return {
-    type: "flex",
-    altText: `✅ แก้ไขเรียบร้อย: ${typeText} (${dateText})`,
-    contents: {
-      type: "bubble",
-      size: "mega",
-      body: {
-        type: "box",
-        layout: "vertical",
-        spacing: "md",
-        contents: [
-          {
-            type: "box",
-            layout: "horizontal",
-            spacing: "sm",
-            contents: [
-              { type: "text", text: "✅", size: "xl", flex: 0 },
-              { type: "text", text: "แก้ไขเรียบร้อยแล้วค่ะ", weight: "bold", size: "lg", wrap: true },
-            ],
-          },
-          { type: "separator" },
-          {
-            type: "box",
-            layout: "vertical",
-            spacing: "sm",
-            contents: [
-              { type: "text", text: typeText, weight: "bold", size: "md" },
-              { type: "text", text: t, wrap: true, size: "md", weight: "bold" },
-              { type: "text", text: `วันที่: ${dateText}`, wrap: true, size: "sm", color: "#555555" },
-              ...(id ? [{ type: "text", text: `#${id}`, size: "xs", color: "#999999" }] : []),
-            ],
-          },
-        ],
-      },
-      footer: {
-        type: "box",
-        layout: "vertical",
-        spacing: "sm",
-        contents: [
-          { type: "button", style: "primary", action: { type: "message", label: "👀 ดูวันหยุด", text: "ดูวันหยุด" } },
-        ],
-      },
-    },
-  };
-}
-
-
 async function processDueReminders(env) {
   const nowIso = nowBangkokIsoLike();
 
@@ -686,8 +630,9 @@ export default {
       try {
         const userId = await getUserIdFromLiffToken(request, env);
 
-        const from = url.searchParams.get("from");
-        const to = url.searchParams.get("to");
+        const rawFrom = url.searchParams.get("from");
+        const rawTo = url.searchParams.get("to");
+        const { from, to } = normalizeRangeIso(rawFrom, rawTo);
         if (!isIsoLike(from) || !isIsoLike(to)) {
           return withCors(request, jsonError("missing/invalid from or to"));
         }
@@ -797,23 +742,7 @@ export default {
         const changes = upd.meta?.changes ?? 0;
         if (changes === 0) return withCors(request, jsonError("not found", 404));
 
-        
-        // ✅ (optional) push confirm on update
-        if (env.PUSH_ON_UPDATE === "1" || env.PUSH_ON_SAVE === "1") {
-          try {
-            await linePush(env, userId, [buildUpdatedFlex({
-              type: cur.type,
-              title: finalTitle,
-              start_at: nextStart,
-              end_at: nextEnd,
-              id
-            })]);
-          } catch (e) {
-            console.error("push update confirm failed", e);
-          }
-        }
-
-return withCors(request, Response.json({ ok: true, title: finalTitle, all_day: normalizedAllDay }));
+        return withCors(request, Response.json({ ok: true, title: finalTitle, all_day: normalizedAllDay }));
       } catch (e) {
         return withCors(request, jsonError(String(e.message || e), 401));
       }
@@ -1136,8 +1065,9 @@ return withCors(request, Response.json({ ok: true, title: finalTitle, all_day: n
     // ✅ GET /holidays/list?user_id=...&from=...&to=...
     if (url.pathname === "/holidays/list" && request.method === "GET") {
       const user_id = url.searchParams.get("user_id");
-      const from = url.searchParams.get("from");
-      const to = url.searchParams.get("to");
+      const rawFrom = url.searchParams.get("from");
+      const rawTo = url.searchParams.get("to");
+      const { from, to } = normalizeRangeIso(rawFrom, rawTo);
 
       if (!user_id) return withCors(request, jsonError("missing user_id"));
       if (!isIsoLike(from) || !isIsoLike(to)) return withCors(request, jsonError("missing/invalid from or to"));
