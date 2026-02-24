@@ -1,5 +1,5 @@
-import { CONFIG } from "./config.js?v=20260224_01";
-import { initLiff } from "./auth.js?v=20260224_01";
+import { CONFIG } from "./config.js?v=20260224_02";
+import { initLiff } from "./auth.js?v=20260224_02";
 import { fetchSubjects, createHoliday } from "./api.js?v=20260224_01";
 import { initForm } from "./form.js?v=20260224_01";
 
@@ -30,12 +30,10 @@ function ymdToDDMMYYYY(ymd) {
 
 function buildConfirmText(payload) {
   const typeText = payload.type === "cancel" ? "ยกคลาส" : "หยุดทั้งวัน";
-
   const s = (payload.start_at || "").slice(0, 10);
   const e = (payload.end_at || "").slice(0, 10);
   const dateText =
     s && e ? (s === e ? ymdToDDMMYYYY(s) : `${ymdToDDMMYYYY(s)} – ${ymdToDDMMYYYY(e)}`) : "-";
-
   const remindCount = Array.isArray(payload.reminders) ? payload.reminders.length : 0;
 
   return [
@@ -63,10 +61,9 @@ async function run() {
     setStatus("กำลังเปิดฟอร์ม…");
 
     const session = await initLiff();
-    if (!session) return; // login redirected
+    if (!session) return; // redirect to login
     const { idToken, profile } = session;
 
-    // top-right user pill
     const pill = $("#profileName");
     if (pill) pill.textContent = profile?.displayName || "ผู้ใช้";
 
@@ -83,22 +80,32 @@ async function run() {
     endDate?.addEventListener("change", updatePreview);
     updatePreview();
 
-    // load subjects
+    // load subjects (ถ้าเจอ IdToken expired → force relogin)
     setStatus("กำลังโหลดตารางวิชา…");
-    const items = await fetchSubjects({ idToken });
+    let items = [];
+    try {
+      items = await fetchSubjects({ idToken });
+    } catch (e) {
+      const msg = e?.message || String(e);
+      if (/IdToken expired/i.test(msg)) {
+        toast("โทเคนหมดอายุ กำลังเข้าสู่ระบบใหม่…", "info");
+        await initLiff({ forceRelogin: true });
+        return;
+      }
+      throw e;
+    }
+
     const subjectsStatus = $("#subjectsStatus");
     if (subjectsStatus) subjectsStatus.textContent = items.length ? `มี ${items.length} รายวิชา` : "ยังไม่มีรายวิชาในระบบ";
 
     setStatus("");
 
-    // init form handler
     initForm({
       el: document,
       mode: CONFIG.getMode(),
       profile,
       subjects: items,
       onSubmit: async (payload) => {
-        // ✅ confirm
         const ok = window.confirm(buildConfirmText(payload));
         if (!ok) {
           toast("ยกเลิกแล้ว 👌", "info");
@@ -113,13 +120,17 @@ async function run() {
 
           setStatus("");
           toast("บันทึกสำเร็จ ✅", "ok");
-
-          // ปิด LIFF อัตโนมัติ (ถ้าเปิดใน LINE)
           setTimeout(() => closeLiffSafely(), 650);
         } catch (e) {
+          const msg = e?.message || String(e);
+          if (/IdToken expired/i.test(msg)) {
+            toast("โทเคนหมดอายุ กำลังเข้าสู่ระบบใหม่…", "info");
+            await initLiff({ forceRelogin: true });
+            return;
+          }
           console.error(e);
           setStatus("");
-          toast(e?.message || String(e), "err");
+          toast(msg, "err");
         }
       },
     });
