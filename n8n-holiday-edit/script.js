@@ -14,6 +14,19 @@ const API_BASE_FROM_WINDOW = (typeof window !== "undefined" && window.__API_BASE
   : "";
 const API_BASE_FROM_QS = new URLSearchParams(location.search).get("apiBase") || "";
 
+// ✅ ส่ง "บันทึกทั้งหมด" เข้า n8n เพื่อยืนยันก่อนค่อยเขียน DB
+const N8N_WEBHOOK_FROM_WINDOW = (typeof window !== "undefined" && window.__N8N_WEBHOOK__)
+  ? String(window.__N8N_WEBHOOK__).trim()
+  : "";
+const N8N_WEBHOOK_FROM_QS = new URLSearchParams(location.search).get("n8n") || "";
+const N8N_WEBHOOK = (N8N_WEBHOOK_FROM_WINDOW || N8N_WEBHOOK_FROM_QS || "").trim();
+
+// (optional) ถ้าอยากให้ n8n ตรวจ key
+const N8N_API_KEY_FROM_WINDOW = (typeof window !== "undefined" && window.__N8N_API_KEY__)
+  ? String(window.__N8N_API_KEY__).trim()
+  : "";
+const N8N_API_KEY = (N8N_API_KEY_FROM_WINDOW || "").trim();
+
 function normalizeBase(u) {
   const s = (u || "").trim();
   if (!s) return "";
@@ -32,11 +45,44 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 function toast(msg, type = "ok") {
   const t = $("#toast");
+  if (!t) return;
   t.textContent = msg;
   t.className = `toast ${type === "err" ? "err" : "ok"}`;
   t.hidden = false;
   clearTimeout(toast._tm);
   toast._tm = setTimeout(() => (t.hidden = true), 3200);
+}
+
+/* ✅ Overlay (สวย ๆ กลางจอ) */
+function showOverlay(kind, title, desc) {
+  const ov = $("#overlay");
+  if (!ov) return;
+  const icon = $("#overlayIcon");
+  const t = $("#overlayTitle");
+  const d = $("#overlayDesc");
+
+  if (icon) icon.className = `overlayIcon ${kind || "loading"}`;
+  if (t) t.textContent = title || "กำลังทำรายการ…";
+  if (d) d.textContent = desc || "รอสักครู่น้า ✨";
+
+  ov.classList.remove("closing");
+  ov.hidden = false;
+}
+function hideOverlay() {
+  const ov = $("#overlay");
+  if (!ov || ov.hidden) return;
+
+  // ✅ fade out (ถ้า CSS รองรับ .closing)
+  ov.classList.add("closing");
+  clearTimeout(hideOverlay._t);
+  hideOverlay._t = setTimeout(() => {
+    ov.hidden = true;
+    ov.classList.remove("closing");
+  }, 260);
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 function ymdToThai(ymd) {
@@ -108,7 +154,18 @@ const state = {
   profile: null,
 
   subjects: [],
+
+  // ✅ original from worker (DB state)
+  originalHolidays: [],
+
+  // ✅ view list = original + drafts (for UI)
   holidays: [],
+
+  // ✅ drafts: id -> { holiday: payload, reminders: [iso], pendingDelete: boolean }
+  drafts: new Map(),
+
+  // ✅ pending delete list
+  pendingDeletes: new Set(),
 
   editing: null,
   editingType: "cancel",
@@ -118,7 +175,8 @@ const state = {
 };
 
 /* =========================
-   API (Worker)
+   API (Worker) — ใช้ตอน "โหลด" เท่านั้น
+   (ตอน commit จริงจะส่งไป n8n)
    ========================= */
 async function apiFetch(path, opts = {}) {
   const base = API_BASE || location.origin;
@@ -167,26 +225,31 @@ async function fetchReminders(holidayId) {
   const data = await apiFetch(u.pathname + "?" + u.searchParams.toString(), { method: "GET" });
   return Array.isArray(data.items) ? data.items : [];
 }
-async function setReminders(holidayId, reminderIsoList) {
-  return apiFetch("/liff/holidays/reminders/set", {
+
+/* =========================
+   API (n8n) — ใช้ตอน "บันทึกทั้งหมด"
+   ========================= */
+async function postToN8n(body) {
+  if (!N8N_WEBHOOK) throw new Error("ยังไม่ได้ตั้งค่า N8N_WEBHOOK (window.__N8N_WEBHOOK__)");
+
+  const headers = new Headers({ "Content-Type": "application/json" });
+  if (N8N_API_KEY) headers.set("x-api-key", N8N_API_KEY);
+
+  // ส่งข้อมูล user ไปช่วย debug/route ใน n8n
+  if (state.profile?.userId) headers.set("x-line-userid", String(state.profile.userId));
+
+  const res = await fetch(N8N_WEBHOOK, {
     method: "POST",
-    body: JSON.stringify({
-      holiday_id: holidayId,
-      reminders: reminderIsoList.map((iso) => ({ remind_at: iso })),
-    }),
+    headers,
+    body: JSON.stringify(body),
   });
-}
-async function updateHoliday(payload) {
-  return apiFetch("/liff/holidays/update", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-async function deleteHoliday(id) {
-  return apiFetch("/liff/holidays/delete", {
-    method: "POST",
-    body: JSON.stringify({ id }),
-  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data?.error || data?.message || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return data;
 }
 
 /* =========================
@@ -374,11 +437,45 @@ function autoSelectNextValidCancelDate() {
 }
 
 /* =========================
+   Draft helpers
+   ========================= */
+function getDraftCount() {
+  return state.drafts.size + state.pendingDeletes.size;
+}
+
+function rebuildViewList() {
+  const merged = [];
+  for (const row of state.originalHolidays) {
+    const id = Number(row.id);
+    const isDel = state.pendingDeletes.has(id);
+    const d = state.drafts.get(id);
+
+    const view = { ...row };
+
+    if (d?.holiday) Object.assign(view, d.holiday);
+    view._draft = !!d;
+    view._pendingDelete = isDel;
+
+    merged.push(view);
+  }
+
+  // แสดงรายการที่ถูก mark ลบเป็นลำดับท้าย (ดูชัด)
+  merged.sort((a, b) => Number(!!a._pendingDelete) - Number(!!b._pendingDelete));
+  state.holidays = merged;
+}
+
+/* =========================
    UI: List
    ========================= */
 function typeBadge(type) {
   if (type === "cancel") return `<span class="badge cancel">🚫 ยกคลาส</span>`;
   return `<span class="badge holiday">🏝️ หยุดทั้งวัน</span>`;
+}
+
+function draftBadge(row) {
+  if (row._pendingDelete) return `<span class="badge pendingDel">🗑️ รอลบ</span>`;
+  if (row._draft) return `<span class="badge draft">✏️ แก้ไขแล้ว</span>`;
+  return "";
 }
 
 function itemTitle(row) {
@@ -398,7 +495,9 @@ function itemSub(row) {
 function renderList() {
   const el = $("#list");
   const hint = $("#listHint");
-  if (!el) return;
+  if (!el || !hint) return;
+
+  const draftN = getDraftCount();
 
   if (!state.holidays.length) {
     hint.textContent = "ไม่พบรายการในช่วงนี้";
@@ -406,16 +505,23 @@ function renderList() {
     return;
   }
 
-  hint.textContent = `พบ ${state.holidays.length} รายการ`;
+  hint.textContent = draftN
+    ? `พบ ${state.holidays.length} รายการ • มีร่างแก้ไข ${draftN} รายการ`
+    : `พบ ${state.holidays.length} รายการ`;
 
   el.innerHTML = state.holidays.map((row) => `
-    <div class="item">
+    <div class="item ${row._pendingDelete ? "isPendingDel" : ""}">
       <div class="itemMain">
         <div class="itemTitle">${itemTitle(row)}</div>
-        <div class="itemSub">${typeBadge(row.type)} <span class="sep">•</span> ${itemSub(row)}</div>
+        <div class="itemSub">
+          ${typeBadge(row.type)}
+          <span class="sep">•</span>
+          ${itemSub(row)}
+          ${draftBadge(row) ? `<span class="sep">•</span>${draftBadge(row)}` : ""}
+        </div>
       </div>
       <div class="itemActions">
-        <button class="iconBtn" data-act="edit" data-id="${row.id}" type="button" title="แก้ไข">✏️</button>
+        <button class="iconBtn" data-act="edit" data-id="${row.id}" type="button" title="แก้ไข" ${row._pendingDelete ? "disabled" : ""}>✏️</button>
         <button class="iconBtn danger" data-act="del" data-id="${row.id}" type="button" title="ลบ">🗑️</button>
       </div>
     </div>
@@ -429,14 +535,12 @@ function renderList() {
       if (!row) return;
 
       if (act === "del") {
-        if (!confirm("ยืนยันลบรายการนี้?")) return;
-        try {
-          await deleteHoliday(id);
-          toast("ลบแล้ว ✅");
-          await loadList();
-        } catch (e) {
-          toast(`ลบไม่สำเร็จ: ${e.message}`, "err");
-        }
+        // ✅ ลบ = stage ไว้ก่อน (ไม่ยิง DB)
+        if (!confirm("ต้องการ “ทำเครื่องหมายลบ” รายการนี้ไว้ก่อนใช่ไหม?\n(จะลบจริงตอนกด “บันทึกทั้งหมด”)")) return;
+        stageDelete(id);
+        toast("ทำเครื่องหมายรอลบแล้ว 🗑️ (ยังไม่ลบจริง)", "ok");
+        rebuildViewList();
+        renderList();
       } else if (act === "edit") {
         openModal(row);
       }
@@ -444,10 +548,16 @@ function renderList() {
   });
 }
 
+function stageDelete(id) {
+  state.pendingDeletes.add(Number(id));
+  state.drafts.delete(Number(id)); // ถ้ากำลังมี draft อยู่ ให้ลบทิ้ง (เพราะจะลบทั้งรายการ)
+}
+
 /* =========================
    Modal Edit
    ========================= */
 function openModal(row) {
+  const id = Number(row.id);
   state.editing = row;
   state.editingType = row.type || "cancel";
 
@@ -469,16 +579,14 @@ function openModal(row) {
 
   $("#mAddRem").onclick = () => addReminderRow(null);
 
-  $("#mDelete").onclick = async () => {
-    if (!confirm("ยืนยันลบรายการนี้?")) return;
-    try {
-      await deleteHoliday(Number(state.editing.id));
-      toast("ลบแล้ว ✅");
-      closeModal();
-      await loadList();
-    } catch (e) {
-      toast(`ลบไม่สำเร็จ: ${e.message}`, "err");
-    }
+  // ✅ ลบใน modal = stage delete เหมือนกัน
+  $("#mDelete").onclick = () => {
+    if (!confirm("ต้องการ “ทำเครื่องหมายลบ” รายการนี้ไว้ก่อนใช่ไหม?\n(จะลบจริงตอนกด “บันทึกทั้งหมด”)")) return;
+    stageDelete(id);
+    toast("ทำเครื่องหมายรอลบแล้ว 🗑️", "ok");
+    closeModal();
+    rebuildViewList();
+    renderList();
   };
 
   $("#mCloseX").onclick = closeModal;
@@ -489,13 +597,19 @@ function openModal(row) {
     toast("ยกเลิกการแก้ไขแล้ว", "ok");
   };
 
-  $("#mSaveBtn").onclick = saveModal;
+  $("#mSaveBtn").onclick = saveModalAsDraft;
 
   applyTypeUI();
 
+  // ✅ Reminders: ถ้ามี draft แล้วใช้ draft / ถ้าไม่มีก็ค่อย fetch จาก worker
   (async () => {
     try {
-      const items = await fetchReminders(row.id);
+      const d = state.drafts.get(id);
+      if (d?.reminders) {
+        d.reminders.forEach((iso) => addReminderRow(iso));
+        return;
+      }
+      const items = await fetchReminders(id);
       if (items.length) items.forEach((r) => addReminderRow(r.remind_at));
     } catch (e) {
       console.warn("fetchReminders failed:", e);
@@ -565,7 +679,8 @@ function applyTypeUI() {
   }
 }
 
-async function saveModal() {
+/* ✅ แทน save จริง: เก็บ draft ในเครื่อง */
+async function saveModalAsDraft() {
   if (!state.editing) return;
   $("#mSaveBtn").disabled = true;
 
@@ -576,7 +691,11 @@ async function saveModal() {
     const title = ($("#mTitleInput").value || "").trim();
     const note = ($("#mNote").value || "").trim();
 
-    let payload = { id, type, title, note };
+    // UX guard: กันยาวเกิน (ปรับได้ตามใจ)
+    if (title.length > 80) throw new Error("หัวข้อยาวเกินไป (ไม่เกิน 80 ตัวอักษรนะคะ)");
+    if (note.length > 500) throw new Error("หมายเหตุยาวเกินไป (ไม่เกิน 500 ตัวอักษรนะคะ)");
+
+    const payload = { id, type, title, note };
 
     if (type === "cancel") {
       const subject_id = $("#mSubject").value;
@@ -599,14 +718,20 @@ async function saveModal() {
       payload.end_at = toIsoBangkokAllDayEnd(endYmd);
     }
 
-    await updateHoliday(payload);
-
     const reminderIsoList = collectReminderIsoList();
-    await setReminders(id, reminderIsoList);
 
-    toast("บันทึกแล้ว ✅");
+    // กันซ้ำ (collect ทำแล้ว) + กันไม่ครบ (ไม่มี dateObj จะไม่ถูก collect)
+    state.pendingDeletes.delete(id); // ถ้าเคย mark ลบไว้ แล้วมาแก้ใหม่ = ยกเลิกรอลบ
+
+    state.drafts.set(id, {
+      holiday: payload,
+      reminders: reminderIsoList,
+    });
+
+    toast("เก็บเป็น “ฉบับร่าง” แล้ว ✨ (ยังไม่บันทึกจริง)", "ok");
     closeModal();
-    await loadList();
+    rebuildViewList();
+    renderList();
   } catch (e) {
     toast(`บันทึกไม่สำเร็จ: ${e.message}`, "err");
   } finally {
@@ -615,34 +740,82 @@ async function saveModal() {
 }
 
 /* =========================
-   ✅ NEW: Top toolbar actions
+   Top toolbar actions
    ========================= */
 function isModalOpen() {
   const m = $("#modal");
   return m && !m.hidden;
 }
 
-/* ✅ “ทิ้งการแก้ไข” = ปิดโมดัล + reload list ให้กลับตาม DB */
+/* ✅ “ทิ้งการแก้ไข” = เคลียร์ draft ทั้งหมด กลับสู่ค่าจริง */
 async function discardEditsAll() {
   try {
     if (isModalOpen()) closeModal();
-    toast("ทิ้งการแก้ไขแล้ว ↩️", "ok");
-    await loadList();
+    state.drafts.clear();
+    state.pendingDeletes.clear();
+    rebuildViewList();
+    renderList();
+    toast("ทิ้งการเปลี่ยนแปลงทั้งหมดแล้ว ↩️", "ok");
   } catch (e) {
     toast(`ทำรายการไม่สำเร็จ: ${e.message}`, "err");
   }
 }
 
-/* ✅ “บันทึกทั้งหมด” = ถ้าโมดัลเปิดอยู่ให้ saveModal เดิมเลย / ถ้าไม่เปิดก็แค่รีโหลด */
+/* ✅ “บันทึกทั้งหมด” = ส่ง draft เข้า n8n ให้ยืนยันก่อน */
 async function saveAll() {
   try {
-    if (isModalOpen()) {
-      await saveModal(); // ใช้ฟังก์ชันเดิม ไม่รื้อ
+    if (isModalOpen()) closeModal();
+
+    const upserts = [];
+    for (const [id, d] of state.drafts.entries()) {
+      upserts.push({
+        id: Number(id),
+        holiday: d.holiday,
+        reminders: Array.isArray(d.reminders) ? d.reminders : [],
+      });
+    }
+
+    const deletes = Array.from(state.pendingDeletes.values()).map((x) => Number(x));
+
+    if (!upserts.length && !deletes.length) {
+      toast("ยังไม่มีอะไรให้บันทึกนะคะ 😊", "ok");
       return;
     }
-    toast("บันทึกครบแล้ว ✅", "ok");
-    await loadList();
+
+    showOverlay("loading", "กำลังส่งไปยืนยัน…", "แป๊บน้า เดี๋ยวบันทึกให้แบบชัวร์ ๆ ✨");
+
+    const body = {
+      action: "holiday_edit_commit",
+      meta: {
+        userId: state.profile?.userId || null,
+        displayName: state.profile?.displayName || null,
+        ts: new Date().toISOString(),
+      },
+      payload: { upserts, deletes },
+    };
+
+    const res = await postToN8n(body);
+
+    if (!res || res.ok !== true) {
+      const msg = res?.error || "n8n ตอบกลับไม่สำเร็จ";
+      throw new Error(msg);
+    }
+
+    showOverlay("ok", "บันทึกเรียบร้อยแล้วค่ะ 💖", "ขอบคุณที่อัปเดตนะคะ เดี๋ยวปิดหน้านี้ให้เลย ✨");
+    await sleep(850);
+
+    // เคลียร์ draft แล้วรีโหลด (กันสถานะค้าง)
+    state.drafts.clear();
+    state.pendingDeletes.clear();
+
+    try { await loadList(); } catch {}
+    await sleep(350);
+
+    try { liff.closeWindow(); } catch {}
   } catch (e) {
+    showOverlay("err", "ยังบันทึกไม่ได้ 🥺", e.message || "ลองใหม่อีกครั้งนะคะ");
+    await sleep(1200);
+    hideOverlay();
     toast(`บันทึกไม่สำเร็จ: ${e.message}`, "err");
   }
 }
@@ -654,6 +827,8 @@ async function loadList() {
   $("#status").textContent = "";
   $("#listHint").textContent = "กำลังโหลด...";
 
+  showOverlay("loading", "กำลังโหลดรายการ…", "กำลังดึงข้อมูลล่าสุดให้น้า ✨");
+
   const now = nowBangkok();
   const from = new Date(now.getFullYear(), now.getMonth() - 2, 1);
   const to = new Date(now.getFullYear(), now.getMonth() + 3, 0);
@@ -662,9 +837,12 @@ async function loadList() {
   const toIso = toIsoBangkokAllDayEnd(dateToYmdLocal(to));
 
   try {
-    state.holidays = await fetchHolidaysRange(fromIso, toIso);
+    state.originalHolidays = await fetchHolidaysRange(fromIso, toIso);
+    rebuildViewList();
     renderList();
+    hideOverlay();
   } catch (e) {
+    hideOverlay();
     $("#listHint").textContent = "โหลดไม่สำเร็จ";
     $("#list").innerHTML = `<div class="empty">Error: ${e.message}</div>`;
   }
@@ -686,6 +864,8 @@ async function init() {
       liff.login();
       return;
     }
+
+    showOverlay("loading", "กำลังเริ่มระบบ…", "กำลังเชื่อมต่อ LINE และโหลดข้อมูล ✨");
 
     state.token = liff.getAccessToken() || "";
     state.idToken = liff.getIDToken() || "";
@@ -709,12 +889,13 @@ async function init() {
 
     $("#reloadBtn").onclick = () => loadList();
 
-    // ✅ เปลี่ยนจาก toast โหมดไม่เปิดใช้งาน -> ให้ทำงานจริง
     $("#editAllBtn").onclick = discardEditsAll;
     $("#saveAllBtn").onclick = saveAll;
 
     await loadList();
+    hideOverlay();
   } catch (e) {
+    hideOverlay();
     toast(`เริ่มระบบไม่สำเร็จ: ${e.message}`, "err");
     console.error(e);
   }

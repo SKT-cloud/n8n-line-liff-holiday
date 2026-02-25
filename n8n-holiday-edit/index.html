@@ -5,18 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>แก้ไข / ลบวันหยุด • StudyBot</title>
 
-  <!-- ✅ ตั้งค่า LIFF ID + Worker API Base -->
+  <!-- ✅ ตั้งค่า LIFF ID + Worker API Base + n8n -->
   <script>
     // LIFF ID ของหน้า "แก้ไข/ลบวันหยุด"
     window.__LIFF_ID__ = "2009146879-3eBGpF5j";
 
     // ✅ Worker URL (สำคัญมาก: ต้องเป็น Worker ไม่ใช่ Pages)
     window.__API_BASE__ = "https://study-holiday-api.suwijuck-kat.workers.dev";
+
+    // ✅ n8n webhook (บันทึกทั้งหมดจะส่งมาที่นี่ เพื่อให้ n8n validate ก่อนค่อยเขียน DB)
+    // ใส่ของจริงของคุณ เช่น https://n8n.example.com/webhook/holiday-edit
+    window.__N8N_WEBHOOK__ = "https://study-holiday-api.suwijuck-kat.workers.dev/webhook-test/holiday-edit";
+
+    // (optional) ถ้าอยากให้ n8n เช็ค key
+    window.__N8N_API_KEY__ = "";
   </script>
 
   <link rel="stylesheet" href="./style.css" />
 
-  <!-- ✅ Flatpickr (เวลา 24h + UX กดง่าย) -->
+  <!-- ✅ Flatpickr -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
   <!-- ✅ LIFF SDK -->
@@ -34,7 +41,7 @@
   <header class="topbar">
     <div>
       <h1 class="title">แก้ไข / ลบวันหยุด</h1>
-      <div class="subtitle">แตะ ✏️ เพื่อแก้ไข หรือ 🗑️ เพื่อลบ (รองรับแจ้งเตือน)</div>
+      <div class="subtitle">แตะ ✏️ เพื่อแก้ไข (เก็บเป็นร่าง) • กด “บันทึกทั้งหมด” เพื่อส่งไปยืนยันก่อนบันทึกจริง</div>
     </div>
     <div class="pill" id="userPill">...</div>
   </header>
@@ -49,7 +56,6 @@
 
         <div class="toolbar">
           <button class="btnGhost" id="reloadBtn" type="button">รีเฟรช</button>
-          <!-- ✅ แก้ข้อความปุ่มให้ถูก -->
           <button class="btnGhost" id="editAllBtn" type="button">ทิ้งการแก้ไข</button>
           <button class="btnPrimary" id="saveAllBtn" type="button">บันทึกทั้งหมด</button>
         </div>
@@ -154,9 +160,9 @@
           <div class="dangerZone">
             <div>
               <div class="label">ลบรายการนี้</div>
-              <div class="help">ลบแล้วจะหายจากระบบทันที</div>
+              <div class="help">ตอนนี้จะ “ทำเครื่องหมายรอลบ” ก่อน (ลบจริงตอนกด “บันทึกทั้งหมด”)</div>
             </div>
-            <button class="btnDanger" id="mDelete" type="button">ลบรายการนี้</button>
+            <button class="btnDanger" id="mDelete" type="button">ทำเครื่องหมายลบ</button>
           </div>
         </div>
       </div>
@@ -166,6 +172,15 @@
         <button class="btnGhost" id="mCloseBtn" type="button">ปิด</button>
         <button class="btnPrimary" id="mSaveBtn" type="button">บันทึกการแก้ไขรายการนี้</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ✅ Overlay (Loading / Success / Error) -->
+  <div class="overlay" id="overlay" hidden>
+    <div class="overlayCard">
+      <div class="overlayIcon loading" id="overlayIcon"></div>
+      <div class="overlayTitle" id="overlayTitle">กำลังโหลด…</div>
+      <div class="overlayDesc" id="overlayDesc">รอสักครู่น้า ✨</div>
     </div>
   </div>
 

@@ -14,49 +14,84 @@ function toast(msg, kind = "info") {
   toast._t = setTimeout(() => (el.hidden = true), 2800);
 }
 
+function showOverlay(
+  kind = "loading",
+  title = "กำลังโหลดข้อมูล…",
+  desc = "รอสักครู่น้า 🥺✨"
+) {
+  const ov = $("#overlay");
+  const icon = $("#overlayIcon");
+  const t = $("#overlayTitle");
+  const d = $("#overlayDesc");
+  if (!ov || !icon || !t || !d) return;
+
+  // ถ้ากำลัง fade-out อยู่ แล้วมีการเรียก show ใหม่ ให้ยกเลิกสถานะ closing
+  ov.classList.remove("closing");
+
+  icon.className = `overlayIcon ${kind}`;
+  t.textContent = title;
+  d.textContent = desc;
+
+  ov.hidden = false;
+  ov.setAttribute("aria-busy", "true");
+}
+
+// ซ่อน overlay แบบนุ่ม ๆ (fade-out) เพื่อไม่ให้หายไปเฉย ๆ
+function hideOverlay(smooth = true) {
+  const ov = $("#overlay");
+  if (!ov) return;
+
+  if (!smooth) {
+    ov.hidden = true;
+    ov.setAttribute("aria-busy", "false");
+    return;
+  }
+
+  ov.classList.add("closing");
+
+  // รอให้ CSS transition เล่นก่อนค่อยซ่อนจริง
+  setTimeout(() => {
+    ov.hidden = true;
+    ov.classList.remove("closing");
+    ov.setAttribute("aria-busy", "false");
+  }, 320);
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 function setStatus(text) {
   const el = $("#status");
   if (!el) return;
   el.textContent = text || "";
 }
 
-// ===== Overlay (center) =====
-function showOverlay({ kind = "loading", title = "กำลังโหลดข้อมูล…", desc = "รอสักครู่น้า 🥺✨" } = {}) {
-  const ov = $("#overlay");
-  const ic = $("#overlayIcon");
-  const ttl = $("#overlayTitle");
-  const ds = $("#overlayDesc");
-
-  if (!ov || !ic || !ttl || !ds) return;
-  ov.hidden = false;
-  ov.setAttribute("aria-busy", kind === "loading" ? "true" : "false");
-
-  ic.className = `overlayIcon ${kind}`;
-  ttl.textContent = title;
-  ds.textContent = desc;
-}
-
-function hideOverlay() {
-  const ov = $("#overlay");
-  if (ov) ov.hidden = true;
-}
-
-function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
-
 function relogin() {
   toast("เซสชันหมดอายุ กำลังพาไปล็อกอินใหม่…", "err");
-  try { window.liff.logout(); } catch(_) {}
+  try {
+    window.liff.logout();
+  } catch (_) {}
   window.liff.login({ redirectUri: location.href });
 }
 
-function daySort(d){
-  const order = ["จันทร์","อังคาร","พุธ","พฤหัสบดี","พฤ","ศุกร์","เสาร์","อาทิตย์","อื่นๆ"];
+function daySort(d) {
+  const order = [
+    "จันทร์",
+    "อังคาร",
+    "พุธ",
+    "พฤหัสบดี",
+    "พฤ",
+    "ศุกร์",
+    "เสาร์",
+    "อาทิตย์",
+    "อื่นๆ",
+  ];
   const i = order.indexOf(d);
   return i === -1 ? 999 : i;
 }
 
-function renderSubjects(items){
-  // ✅ FIX: index.html ใช้ id="subjects"
+function renderSubjects(items) {
   const list = $("#subjects");
   if (!list) return;
 
@@ -74,11 +109,12 @@ function renderSubjects(items){
   }
 
   [...grouped.entries()]
-    .sort((a,b)=>daySort(a[0]) - daySort(b[0]))
+    .sort((a, b) => daySort(a[0]) - daySort(b[0]))
     .forEach(([day, arr]) => {
-      arr.sort((a,b) =>
-        String(a.start_time||"").localeCompare(String(b.start_time||"")) ||
-        String(a.subject_code||"").localeCompare(String(b.subject_code||""))
+      arr.sort(
+        (a, b) =>
+          String(a.start_time || "").localeCompare(String(b.start_time || "")) ||
+          String(a.subject_code || "").localeCompare(String(b.subject_code || ""))
       );
 
       const sec = document.createElement("section");
@@ -109,8 +145,12 @@ function renderSubjects(items){
         card.dataset.payload = JSON.stringify(payload);
 
         card.innerHTML = `
-          <div class="subTime">${(s.start_time||"??:??")}–${(s.end_time||"??:??")}</div>
-          <div class="subCode">${s.subject_code || ""} <span class="subType">${s.type || ""}</span></div>
+          <div class="subTime">${(s.start_time || "??:??")}–${
+          s.end_time || "??:??"
+        }</div>
+          <div class="subCode">${s.subject_code || ""} <span class="subType">${
+          s.type || ""
+        }</span></div>
           <div class="subName">${s.subject_name || ""}</div>
           <div class="subMeta">${s.room ? `ห้อง ${s.room}` : ""}</div>
           <div class="subTick">✓</div>
@@ -127,7 +167,7 @@ function renderSubjects(items){
 async function run() {
   try {
     setStatus("กำลังเปิดฟอร์ม...");
-    showOverlay({ kind: "loading", title: "กำลังเปิดฟอร์ม…", desc: "เตรียมข้อมูลให้พร้อมเลยน้า ✨" });
+    showOverlay("loading", "กำลังโหลดข้อมูล…", "กำลังเชื่อมต่อกับระบบนะคะ ✨");
 
     const { idToken, profile } = await initLiff();
     if (!idToken) return;
@@ -137,7 +177,6 @@ async function run() {
 
     // load subjects
     setStatus("กำลังโหลดตารางวิชา...");
-    showOverlay({ kind: "loading", title: "กำลังโหลดข้อมูล…", desc: "ดึงรายวิชาอยู่ค่ะ รอแป๊บนึงน้า ⏳" });
     let items = [];
     try {
       items = await fetchSubjects({ idToken });
@@ -147,74 +186,98 @@ async function run() {
         return;
       }
       console.error(err);
+      showOverlay("err", "โหลดข้อมูลไม่สำเร็จ", "" + (err?.message || String(err)));
+      await sleep(1400);
+      hideOverlay(true);
       toast(err?.message || String(err), "err");
       items = [];
     }
 
     const subjectsStatus = $("#subjectsStatus");
     if (subjectsStatus) {
-      subjectsStatus.textContent = items.length ? `มี ${items.length} รายวิชา` : "ยังไม่มีข้อมูลวิชาในระบบ 😅";
+      subjectsStatus.textContent = items.length
+        ? `มี ${items.length} รายวิชา`
+        : "ยังไม่มีข้อมูลวิชาในระบบ 😅";
     }
 
     renderSubjects(items);
     setStatus("");
-    hideOverlay();
 
+    // ✅ โหลดสำเร็จแบบน่ารัก ๆ ก่อนค่อยหายไป
+    showOverlay(
+      "ok",
+      "โหลดสำเร็จแล้ววว ✨",
+      items.length
+        ? "พร้อมให้เลือกวันหยุดแล้วค่าา 💖"
+        : "ยังไม่มีวิชา แต่เพิ่มวันหยุดทั้งวันได้เลยนะคะ 🌈"
+    );
+    await sleep(850);
+    hideOverlay(true);
+
+    // ✅ จุดสำคัญ: bindForm ต้องไม่วงเล็บพัง (แก้เรียบร้อยแล้ว)
     bindForm({
       onSubmit: async (payload) => {
-        const ok = window.confirm("ยืนยันการบันทึกใช่ไหม?\n\nกด “ตกลง” เพื่อบันทึก หรือ “ยกเลิก” เพื่อกลับไปแก้ไข");
-        if (!ok) return;
-
-        // ✅ ส่งให้ n8n ตรวจ+บันทึก+ส่ง Flex เอง
-        setStatus("กำลังส่งข้อมูลให้น8n...");
-        showOverlay({ kind: "loading", title: "กำลังบันทึก…", desc: "กำลังเช็คข้อมูลก่อนบันทึกให้น้า 🧠✨" });
-
-        const ctx = (() => {
-          try {
-            const c = window.liff.getContext?.() || {};
-            return {
-              ...c,
-              userId: c.userId || c?.userId || null,
-              displayName: profile?.displayName || null,
-              idToken, // ถ้าไม่อยากส่งให้ n8n ก็ลบได้
-              ts: Date.now(),
-            };
-          } catch {
-            return { displayName: profile?.displayName || null, idToken, ts: Date.now() };
-          }
-        })();
+        // ✅ ส่งให้ n8n ตรวจ/บันทึก/ส่ง flex ก่อน แล้วค่อยปิด LIFF
+        showOverlay("loading", "กำลังบันทึก…", "เดี๋ยวแป๊บนึงนะคะ 💫");
+        setStatus("กำลังตรวจสอบและบันทึกผ่านระบบ...");
 
         try {
-          await submitHolidayToN8n({ payload, context: ctx });
-        } catch (err) {
-          showOverlay({ kind: "err", title: "บันทึกไม่สำเร็จ 🥺", desc: err?.message || String(err) });
+          await submitHolidayToN8n({
+            payload,
+            context: {
+              userId: profile?.userId,
+              displayName: profile?.displayName,
+              idToken, // เผื่อ n8n จะใช้ยิง worker แบบ secure
+            },
+          });
+
           setStatus("");
-          // ให้ user อ่านก่อน แล้วค่อยปิด overlay เองโดยกด OK
-          await sleep(450);
-          window.alert(`บันทึกไม่สำเร็จ\n\n${err?.message || err}`);
-          hideOverlay();
+          showOverlay(
+            "ok",
+            "บันทึกเรียบร้อยแล้วค่าา 💖",
+            "เดี๋ยวส่งสรุปเข้าไลน์ให้นะคะ ✨"
+          );
+          await sleep(1200);
+
+          // ทำให้หายไปแบบนุ่ม ๆ ก่อนค่อยปิด LIFF
+          hideOverlay(true);
+          await sleep(220);
+
+          try {
+            window.liff.closeWindow();
+          } catch (_) {}
+        } catch (err) {
+          console.error(err);
+          setStatus("");
+
+          const msg = (err?.message || String(err) || "บันทึกไม่สำเร็จ").slice(
+            0,
+            220
+          );
+          showOverlay("err", "บันทึกไม่สำเร็จ 😿", msg);
+          await sleep(1600);
+          hideOverlay(true);
+
+          toast(msg, "err");
           return;
         }
-
-        showOverlay({ kind: "ok", title: "บันทึกสำเร็จแล้ว ✅", desc: "ส่งไปที่ไลน์ให้เรียบร้อยน้า 💖" });
-        setStatus("");
-        await sleep(550);
-        try { window.liff.closeWindow(); } catch(_) {}
       },
+
       onTokenExpired: relogin,
+
       onError: (err) => {
         console.error(err);
         toast(err?.message || String(err), "err");
         setStatus("");
-        hideOverlay();
-      }
+      },
     });
-
   } catch (e) {
     console.error(e);
     setStatus("");
+    try {
+      hideOverlay(true);
+    } catch (_) {}
     toast(`เปิดฟอร์มไม่สำเร็จ: ${e?.message || e}`, "err");
-    showOverlay({ kind: "err", title: "เปิดฟอร์มไม่สำเร็จ 🥺", desc: e?.message || String(e) });
   }
 }
 

@@ -15,7 +15,6 @@ async function requestJson(path, { method = "GET", idToken, body } = {}) {
 
   if (!res.ok || data.ok === false) {
     const msg = data?.error || data?.message || `HTTP ${res.status}`;
-    // ทำให้ main.js จับได้ง่าย
     if (/expired/i.test(msg)) {
       const err = new Error("IDTOKEN_EXPIRED");
       err.code = "IDTOKEN_EXPIRED";
@@ -32,30 +31,43 @@ export async function fetchSubjects({ idToken }) {
   return data.items || [];
 }
 
-export async function createHoliday({ idToken, payload }) {
-  return requestJson("/liff/holidays/create", { method: "POST", idToken, body: payload });
-}
-
-// ✅ NEW: ส่งเข้า n8n ก่อน (ให้ n8n validate + save + push/reply Flex เอง)
+/**
+ * ✅ ส่งข้อมูลไปให้ n8n ตรวจ + บันทึก + push flex (ตาม flow ใหม่)
+ * n8n ควรตอบกลับ:
+ *  - { ok:true, message?:string }
+ *  - { ok:false, error:"..." }
+ */
 export async function submitHolidayToN8n({ payload, context }) {
-  if (!CONFIG.N8N_WEBHOOK_SAVE_HOLIDAY) {
-    throw new Error("ยังไม่ได้ตั้งค่า CONFIG.N8N_WEBHOOK_SAVE_HOLIDAY");
-  }
+  const url = CONFIG.N8N_WEBHOOK_SAVE_HOLIDAY;
 
-  const res = await fetch(CONFIG.N8N_WEBHOOK_SAVE_HOLIDAY, {
+  const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": CONFIG.N8N_WEBHOOK_KEY,
+    },
     body: JSON.stringify({
       action: "save_holiday",
       payload,
-      context,
+      context: {
+        userId: context?.userId || null,
+        displayName: context?.displayName || null,
+        idToken: context?.idToken || null,
+        ts: Date.now(),
+      },
     }),
   });
 
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.ok === false) {
-    const msg = data?.error || data?.message || `HTTP ${res.status}`;
-    throw new Error(msg);
+  // ถ้า n8n ตอบไม่ใช่ 2xx ให้โชว์ raw text ไปเลย (ดีบักง่าย)
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`n8n error (${res.status}): ${text || "no body"}`.slice(0, 300));
   }
+
+  const data = await res.json().catch(() => ({}));
+  if (!data?.ok) {
+    throw new Error(data?.error || data?.message || "บันทึกไม่สำเร็จ");
+  }
+
   return data;
 }
