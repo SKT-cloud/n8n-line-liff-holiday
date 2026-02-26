@@ -244,18 +244,6 @@ textarea{ resize: vertical; min-height: 110px; }
   background: rgba(15,23,42,.35);
   backdrop-filter: blur(6px);
   z-index: 10000;
-  opacity: 1;
-  transition: opacity .32s ease;
-}
-
-/* ✅ smooth fade-out when closing (used by main.js) */
-.overlay.closing{
-  opacity: 0;
-}
-
-.overlay.closing .overlayCard{
-  transform: translateY(8px) scale(.98);
-  opacity: 0;
 }
 
 .overlay[hidden]{ display:none !important; }
@@ -268,7 +256,6 @@ textarea{ resize: vertical; min-height: 110px; }
   box-shadow: var(--shadow);
   padding: 18px 18px 16px;
   text-align: center;
-  transition: transform .32s ease, opacity .32s ease;
   animation: popIn .18s ease;
 }
 
