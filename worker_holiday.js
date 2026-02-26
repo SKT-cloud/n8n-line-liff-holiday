@@ -28,6 +28,11 @@ function jsonError(msg, status = 400) {
   return Response.json({ ok: false, error: msg }, { status });
 }
 
+// ✅ structured error with code (for UX)
+function jsonErrorCode(code, msg, status = 400) {
+  return Response.json({ ok: false, code, error: msg }, { status });
+}
+
 function isIsoLike(s) {
   return typeof s === "string" && s.length >= 10;
 }
@@ -162,6 +167,15 @@ async function ensureTitle(env, userId, type, subject_id, title) {
   return cleaned;
 }
 
+
+// ✅ Duplicate message (cancel) — friendly UX
+function buildDuplicateCancelMessage(title, start_at) {
+  const ymd = (String(start_at || "").slice(0, 10)) || "";
+  const d = ymdToThaiShort(ymd);
+  const t = (title && String(title).trim()) ? String(title).trim() : "(ไม่ทราบชื่อวิชา)";
+  return `อุ๊ย~ รายการยกคลาสนี้มีอยู่แล้วนะคะ 🥺✨\n${t} ${d}`;
+}
+
 function computeRemindAtFromStart(start_at, days_before, timeHHMM) {
   if (!isIsoLike(start_at)) throw new Error("invalid start_at");
   if (!isHHMM(timeHHMM)) throw new Error("invalid time");
@@ -274,6 +288,16 @@ function ymdToThai(ymd) {
   const [y, m, d] = String(ymd).split("-");
   if (!y || !m || !d) return "-";
   return `${d}/${m}/${y}`;
+}
+
+// ✅ Thai short date: "3มี.ค." (no year)
+const TH_MONTH_SHORT = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+function ymdToThaiShort(ymd) {
+  if (!ymd) return "-";
+  const [Y, M, D] = String(ymd).slice(0,10).split("-").map((x) => Number(x));
+  if (!Y || !M || !D) return "-";
+  const m = TH_MONTH_SHORT[M - 1] || "";
+  return `${D}${m}`;
 }
 
 function isoToThaiDateTime(iso) {
@@ -466,6 +490,24 @@ export default {
 
         const normalizedAllDay = normalizeAllDayByType(type, all_day);
         const finalTitle = await ensureTitle(env, userId, type, subject_id ?? null, title);
+
+        // DUPLICATE_CANCEL_LIFF_CREATE
+        if (type === "cancel") {
+          const ymd = String(start_at).slice(0, 10);
+          const exists = await env.DB.prepare(
+            `SELECT id, title FROM holidays
+             WHERE user_id = ?
+               AND type = 'cancel'
+               AND subject_id = ?
+               AND substr(start_at, 1, 10) = ?
+             LIMIT 1`
+          ).bind(userId, subject_id ?? null, ymd).first();
+
+          if (exists) {
+            const msg = buildDuplicateCancelMessage(exists.title || finalTitle, start_at);
+            return withCors(request, jsonErrorCode("DUPLICATE", msg, 409));
+          }
+        }
 
         const ins = await env.DB.prepare(
           `INSERT INTO holidays (user_id, type, subject_id, all_day, start_at, end_at, title, note, created_at, updated_at)
@@ -1027,6 +1069,24 @@ export default {
 
       const normalizedAllDay = normalizeAllDayByType(type, all_day);
       const finalTitle = await ensureTitle(env, user_id, type, subject_id ?? null, title);
+
+      // DUPLICATE_CANCEL_INTERNAL_HOLIDAYS
+      if (type === "cancel") {
+        const ymd = String(start_at).slice(0, 10);
+        const exists = await env.DB.prepare(
+          `SELECT id, title FROM holidays
+           WHERE user_id = ?
+             AND type = 'cancel'
+             AND subject_id = ?
+             AND substr(start_at, 1, 10) = ?
+           LIMIT 1`
+        ).bind(user_id, subject_id ?? null, ymd).first();
+
+        if (exists) {
+          const msg = buildDuplicateCancelMessage(exists.title || finalTitle, start_at);
+          return withCors(request, jsonErrorCode("DUPLICATE", msg, 409));
+        }
+      }
 
       const ins = await env.DB.prepare(
         `INSERT INTO holidays (user_id, type, subject_id, all_day, start_at, end_at, title, note, created_at, updated_at)
