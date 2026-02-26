@@ -1,30 +1,35 @@
-// main.js
-import { loadConfig } from "./config.js";
-import { initAuth, relogin } from "./auth.js";
-import { initHolidayForm } from "./form.js";
-import { apiSaveHoliday } from "./api.js";
+import { initLiff } from "./auth.js";
+import { fetchSubjects, submitHolidayToN8n } from "./api.js";
+import { bindForm } from "./form.js";
 
-// ===== helpers =====
-const $ = (sel) => document.querySelector(sel);
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const $ = (s) => document.querySelector(s);
 
-function setStatus(text = "") {
-  const el = $("#status");
-  if (el) el.textContent = text || "";
+// ใส่ข้อความหลายบรรทัดให้ element (รองรับ \n) แบบปลอดภัย (ไม่ใช้ innerHTML)
+function setMultilineText(el, text) {
+  const s = (text ?? "").toString();
+  el.textContent = "";
+  const parts = s.split("\n");
+  parts.forEach((p, i) => {
+    if (i) el.appendChild(document.createElement("br"));
+    el.appendChild(document.createTextNode(p));
+  });
 }
 
-// ===== toast (ยังเก็บไว้ใช้ตอน success/info ได้) =====
-function toast(msg, type = "ok") {
+function toast(msg, kind = "info") {
   const el = $("#toast");
   if (!el) return;
-
   el.textContent = msg;
-  el.classList.remove("ok", "err", "show");
-  el.classList.add(type);
-  el.classList.add("show");
-
+  el.className = `toast ${kind}`;
+  el.hidden = false;
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => el.classList.remove("show"), 2600);
+  toast._t = setTimeout(() => (el.hidden = true), 2800);
+}
+
+function hideToast() {
+  const el = $("#toast");
+  if (!el) return;
+  clearTimeout(toast._t);
+  el.hidden = true;
 }
 
 function showOverlay(
@@ -38,12 +43,15 @@ function showOverlay(
   const d = $("#overlayDesc");
   if (!ov || !icon || !t || !d) return;
 
+  // ไม่ให้ซ้อน 2 ที่ (toast + overlay) เวลาแจ้งเตือนสำคัญ
+  hideToast();
+
   // ถ้ากำลัง fade-out อยู่ แล้วมีการเรียก show ใหม่ ให้ยกเลิกสถานะ closing
   ov.classList.remove("closing");
 
   icon.className = `overlayIcon ${kind}`;
   t.textContent = title;
-  d.textContent = desc;
+  setMultilineText(d, desc);
 
   ov.hidden = false;
   ov.setAttribute("aria-busy", "true");
@@ -202,7 +210,7 @@ async function run() {
       showOverlay("err", "โหลดข้อมูลไม่สำเร็จ", "" + (err?.message || String(err)));
       await sleep(1400);
       hideOverlay(true);
-      toast(err?.message || String(err), "err");
+      // ใช้ overlay อย่างเดียว (ไม่ให้ toast ซ้ำ)
       items = [];
     }
 
@@ -227,10 +235,8 @@ async function run() {
     await sleep(850);
     hideOverlay(true);
 
-    // ✅ จุดสำคัญ: bindForm ต้องไม่วงเล็บพัง (แก้เรียบร้อยแล้ว)
     bindForm({
       onSubmit: async (payload) => {
-        // ✅ ส่งให้ n8n ตรวจ/บันทึก/ส่ง flex ก่อน แล้วค่อยปิด LIFF
         showOverlay("loading", "กำลังบันทึก…", "เดี๋ยวแป๊บนึงนะคะ 💫");
         setStatus("กำลังตรวจสอบและบันทึกผ่านระบบ...");
 
@@ -240,7 +246,7 @@ async function run() {
             context: {
               userId: profile?.userId,
               displayName: profile?.displayName,
-              idToken, // เผื่อ n8n จะใช้ยิง worker แบบ secure
+              idToken,
             },
           });
 
@@ -252,7 +258,6 @@ async function run() {
           );
           await sleep(1200);
 
-          // ทำให้หายไปแบบนุ่ม ๆ ก่อนค่อยปิด LIFF
           hideOverlay(true);
           await sleep(220);
 
@@ -260,7 +265,7 @@ async function run() {
             window.liff.closeWindow();
           } catch (_) {}
         } catch (err) {
-          showOverlay({ kind: "err", title: "บันทึกไม่สำเร็จ 🥺", desc: err?.message || String(err) });
+          console.error(err);
           setStatus("");
 
           const msg = (err?.message || String(err) || "บันทึกไม่สำเร็จ").slice(
@@ -270,32 +275,19 @@ async function run() {
           showOverlay("err", "บันทึกไม่สำเร็จ 😿", msg);
           await sleep(1600);
           hideOverlay(true);
-
-          toast(msg, "err");
+          // ใช้ overlay อย่างเดียว (ไม่ให้ toast ซ้ำ)
           return;
         }
-
-        showOverlay({ kind: "ok", title: "บันทึกสำเร็จแล้ว ✅", desc: "ส่งไปที่ไลน์ให้เรียบร้อยน้า 💖" });
-        setStatus("");
-        await sleep(550);
-        try { window.liff.closeWindow(); } catch(_) {}
       },
+
       onTokenExpired: relogin,
+
       onError: (err) => {
         console.error(err);
-
-        // ❗ แสดง error ที่เดียว (overlay)
-        const msg = (err?.message || String(err) || "เกิดข้อผิดพลาด").slice(0, 220);
-        try {
-          showOverlay("err", "เกิดข้อผิดพลาด 😿", msg);
-        } catch (_) {
-          // fallback เงียบ ๆ
-        }
+        toast(err?.message || String(err), "err");
         setStatus("");
-        hideOverlay();
-      }
+      },
     });
-
   } catch (e) {
     console.error(e);
     setStatus("");
@@ -303,8 +295,7 @@ async function run() {
       hideOverlay(true);
     } catch (_) {}
     toast(`เปิดฟอร์มไม่สำเร็จ: ${e?.message || e}`, "err");
-    showOverlay({ kind: "err", title: "เปิดฟอร์มไม่สำเร็จ 🥺", desc: e?.message || String(e) });
   }
 }
 
-bootstrap();
+document.addEventListener("DOMContentLoaded", run);

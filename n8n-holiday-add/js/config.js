@@ -4,7 +4,7 @@ export const CONFIG = {
 
   // ✅ n8n webhook (ให้ LIFF ยิงเข้า n8n แล้วให้ n8n เป็นคนบันทึก + ส่ง Flex)
   // ใส่ URL จริงของคุณตรงนี้
-  N8N_WEBHOOK_SAVE_HOLIDAY: "",
+  N8N_WEBHOOK_SAVE_HOLIDAY: "https://spu-n8n.spu.ac.th/webhook/liff-holiday-add",
 
   // ✅ LIFF IDs (ของคุณ)
   LIFF_ID_ADD: "2009146879-xoNc2sVq",
