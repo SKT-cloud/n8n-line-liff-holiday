@@ -235,7 +235,7 @@ function addDaysYMD(ymd, n) {
   dt.setUTCDate(dt.getUTCDate() + n);
   return dt.toISOString().slice(0, 10);
 }
-const TH_WEEKDAY = ["อาทิตย์","จันทร์","อังคาร","พุธ","พฤหัสบดี","ศุกร์","เสาร์"];
+const TH_WEEKDAY = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 function weekdayThaiFromYMD(ymd) {
   const dt = ymdToUTCNoon(ymd);
   return TH_WEEKDAY[dt.getUTCDay()] || null;
@@ -283,7 +283,7 @@ function ymdToThai(ymd) {
 }
 
 // ✅ Thai short date like "3มี.ค." (no year)
-const TH_MONTH_SHORT = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+const TH_MONTH_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 function ymdToThaiShort(ymd) {
   if (!ymd) return "-";
   const [y, m, d] = String(ymd).split("-");
@@ -313,8 +313,8 @@ function buildReminderFlex(row, env) {
 
   const typeText =
     row.h_type === "cancel" ? "🚫 ยกคลาส" :
-    row.h_type === "holiday" ? "🏝️ วันหยุด" :
-    "🏝️ แจ้งเตือน";
+      row.h_type === "holiday" ? "🏝️ วันหยุด" :
+        "🏝️ แจ้งเตือน";
 
   const title =
     row.h_title && String(row.h_title).trim()
@@ -326,8 +326,8 @@ function buildReminderFlex(row, env) {
   const dateText =
     startYmd
       ? (endYmd && endYmd !== startYmd
-          ? `${ymdToThai(startYmd)} – ${ymdToThai(endYmd)}`
-          : `${ymdToThai(startYmd)}`)
+        ? `${ymdToThai(startYmd)} – ${ymdToThai(endYmd)}`
+        : `${ymdToThai(startYmd)}`)
       : "-";
 
   return {
@@ -377,8 +377,8 @@ function buildSavedFlex({ type, title, start_at, end_at }) {
   const dateText =
     startYmd
       ? (endYmd && endYmd !== startYmd
-          ? `${ymdToThai(startYmd)} – ${ymdToThai(endYmd)}`
-          : `${ymdToThai(startYmd)}`)
+        ? `${ymdToThai(startYmd)} – ${ymdToThai(endYmd)}`
+        : `${ymdToThai(startYmd)}`)
       : "-";
 
   const typeText = type === "cancel" ? "🚫 ยกคลาส" : "📌 วันหยุด";
@@ -433,8 +433,8 @@ function buildUpdatedFlex({ type, title, start_at, end_at }) {
   const dateText =
     startYmd
       ? (endYmd && endYmd !== startYmd
-          ? `${ymdToThai(startYmd)} – ${ymdToThai(endYmd)}`
-          : `${ymdToThai(startYmd)}`)
+        ? `${ymdToThai(startYmd)} – ${ymdToThai(endYmd)}`
+        : `${ymdToThai(startYmd)}`)
       : "-";
 
   const typeText = type === "cancel" ? "🚫 ยกคลาส" : "🏝️ วันหยุด";
@@ -624,26 +624,26 @@ export default {
         const normalizedAllDay = normalizeAllDayByType(type, all_day);
         const finalTitle = await ensureTitle(env, userId, type, subject_id ?? null, title);
 
-                // ✅ DUPLICATE GUARD (cancel): prevent duplicate cancel for same subject+day
-                if (type === "cancel" && (subject_id ?? null)) {
-                  const exists = await env.DB.prepare(
-                    `SELECT id
+        // ✅ DUPLICATE GUARD (cancel): prevent duplicate cancel for same subject+day
+        if (type === "cancel" && (subject_id ?? null)) {
+          const exists = await env.DB.prepare(
+            `SELECT id
                      FROM holidays
                      WHERE user_id = ?
                        AND type = 'cancel'
                        AND subject_id = ?
                        AND substr(start_at, 1, 10) = substr(?, 1, 10)
                      LIMIT 1`
-                  ).bind(userId, subject_id, start_at).first();
+          ).bind(userId, subject_id, start_at).first();
 
-                  if (exists) {
-                    const dShort = isoToThaiShort(start_at);
-                    const line2 = `${finalTitle || String(subject_id).trim()} ${dShort}`.trim();
-                    const msg = `อุ๊ย~ รายการยกคลาสนี้มีอยู่แล้วนะคะ 🥺✨
+          if (exists) {
+            const dShort = isoToThaiShort(start_at);
+            const line2 = `${finalTitle || String(subject_id).trim()} ${dShort}`.trim();
+            const msg = `อุ๊ย~ รายการยกคลาสนี้มีอยู่แล้วนะคะ 🥺✨
 ${line2}`;
-                    return withCors(request, jsonErrorCode("DUPLICATE", msg, 409));
-                  }
-                }
+            return withCors(request, jsonErrorCode("DUPLICATE", msg, 409));
+          }
+        }
 
         const ins = await env.DB.prepare(
           `INSERT INTO holidays (user_id, type, subject_id, all_day, start_at, end_at, title, note, created_at, updated_at)
@@ -782,8 +782,8 @@ ${line2}`;
         if (!cur) return withCors(request, jsonError("not found", 404));
 
         const nextStart = body.start_at !== undefined ? body.start_at : cur.start_at;
-        const nextEnd   = body.end_at   !== undefined ? body.end_at   : cur.end_at;
-        const nextNote  = body.note     !== undefined ? body.note     : cur.note;
+        const nextEnd = body.end_at !== undefined ? body.end_at : cur.end_at;
+        const nextNote = body.note !== undefined ? body.note : cur.note;
         const nextSubjectId = body.subject_id !== undefined ? body.subject_id : cur.subject_id;
 
         if (!isIsoLike(nextStart) || !isIsoLike(nextEnd)) {
@@ -960,8 +960,8 @@ ${line2}`;
           if (!cur) continue;
 
           const nextStart = u.start_at !== undefined ? u.start_at : cur.start_at;
-          const nextEnd   = u.end_at   !== undefined ? u.end_at   : cur.end_at;
-          const nextNote  = u.note     !== undefined ? u.note     : cur.note;
+          const nextEnd = u.end_at !== undefined ? u.end_at : cur.end_at;
+          const nextNote = u.note !== undefined ? u.note : cur.note;
           const nextSubjectId = u.subject_id !== undefined ? u.subject_id : cur.subject_id;
 
           if (!isIsoLike(nextStart) || !isIsoLike(nextEnd)) continue;
@@ -1048,7 +1048,7 @@ ${line2}`;
           if (modifier === "next_week") {
             const monThis = weekStartMondayYMD(today);
             const monNext = addDaysYMD(monThis, 7);
-            const order = ["จันทร์","อังคาร","พุธ","พฤหัสบดี","ศุกร์","เสาร์","อาทิตย์"];
+            const order = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"];
             const idx = order.indexOf(reqWeekday);
             return idx >= 0 ? addDaysYMD(monNext, idx) : monNext;
           }
@@ -1232,25 +1232,31 @@ ${line2}`;
       const normalizedAllDay = normalizeAllDayByType(type, all_day);
       const finalTitle = await ensureTitle(env, user_id, type, subject_id ?? null, title);
 
-// ✅ DUPLICATE GUARD (cancel): prevent duplicate cancel for same subject+day
-if (type === "cancel" && (subject_id ?? null)) {
-  const exists = await env.DB.prepare(
-    `SELECT id
+      // ✅ DUPLICATE GUARD (cancel): prevent duplicate cancel for same subject+day
+      if (type === "cancel" && (subject_id ?? null)) {
+        const exists = await env.DB.prepare(
+          `SELECT id
      FROM holidays
      WHERE user_id = ?
        AND type = 'cancel'
        AND subject_id = ?
        AND substr(start_at, 1, 10) = substr(?, 1, 10)
      LIMIT 1`
-  ).bind(user_id, subject_id, start_at).first();
+        ).bind(user_id, subject_id, start_at).first();
 
-  if (exists) {
-    const dShort = isoToThaiShort(start_at);
-    const line2 = `${finalTitle || String(subject_id).trim()} ${dShort}`.trim();
-    const msg = `อุ๊ย~ รายการยกคลาสนี้มีอยู่แล้วนะคะ 🥺✨\n${line2}`;
-    return withCors(request, jsonErrorCode("DUPLICATE", msg, 409));
-  }
-}
+        if (exists) {
+          const dShort = isoToThaiShort(start_at);
+
+          const titleLine = `${finalTitle || String(subject_id).trim()}`.trim();
+          const dateLine = dShort;
+
+          const msg =
+            `อุ๊ย~ รายการยกคลาสนี้มีอยู่แล้วนะคะ 🥺✨\n\n` +
+            `${titleLine}\n${dateLine}`;
+
+          return withCors(request, jsonErrorCode("DUPLICATE", msg, 409));
+        }
+      }
 
       const ins = await env.DB.prepare(
         `INSERT INTO holidays (user_id, type, subject_id, all_day, start_at, end_at, title, note, created_at, updated_at)
